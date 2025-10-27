@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
@@ -56,8 +57,14 @@ type Borrower = {
   email: string;
 };
 
-const reminderFormSchema = insertReminderSchema.extend({
+const reminderFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  message: z.string().min(1, "Message is required"),
+  reminderType: z.string(),
+  borrowerId: z.string().optional(),
   scheduledFor: z.string(),
+  status: z.string().optional(),
+  isRecurring: z.boolean().optional(),
 });
 
 export default function Reminders() {
@@ -78,6 +85,7 @@ export default function Reminders() {
       title: "",
       message: "",
       reminderType: "payment",
+      borrowerId: "__all__",
       scheduledFor: new Date().toISOString().slice(0, 16),
       status: "pending",
       isRecurring: false,
@@ -89,10 +97,10 @@ export default function Reminders() {
       const payload = {
         ...data,
         scheduledFor: new Date(data.scheduledFor),
-        // Send null instead of empty string for borrowerId
-        borrowerId: data.borrowerId || null,
+        // Send null instead of empty string or __all__ for borrowerId
+        borrowerId: data.borrowerId && data.borrowerId !== "__all__" ? data.borrowerId : null,
       };
-      return apiRequest("/api/reminders", "POST", payload);
+      return apiRequest("POST", "/api/reminders", payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reminders"] });
@@ -114,7 +122,7 @@ export default function Reminders() {
 
   const sendMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/reminders/${id}/send`, "POST");
+      return apiRequest("POST", `/api/reminders/${id}/send`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/reminders"] });
@@ -191,6 +199,9 @@ export default function Reminders() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Create Reminder</DialogTitle>
+              <DialogDescription>
+                Schedule a reminder for payment or other notifications
+              </DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -254,7 +265,7 @@ export default function Reminders() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">All Borrowers</SelectItem>
+                          <SelectItem value="__all__">All Borrowers</SelectItem>
                           {borrowers.map((borrower) => (
                             <SelectItem key={borrower.id} value={borrower.id}>
                               {borrower.name}

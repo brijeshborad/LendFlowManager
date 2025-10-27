@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
@@ -71,7 +72,7 @@ export default function EmailTemplates() {
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof templateFormSchema>) => {
-      return apiRequest("/api/email-templates", "POST", data);
+      return apiRequest("POST", "/api/email-templates", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/email-templates"] });
@@ -129,6 +130,9 @@ export default function EmailTemplates() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create Email Template</DialogTitle>
+              <DialogDescription>
+                Create a reusable email template with placeholders for automated communications
+              </DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
