@@ -1,4 +1,4 @@
-import { Home, Users, Wallet, FileText, Settings, Bell, Mail } from "lucide-react";
+import { Home, Users, Wallet, TrendingUp, FileText, Settings, Bell, Mail } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +26,11 @@ const menuItems = [
     title: "Loans",
     url: "/loans",
     icon: Wallet,
+  },
+  {
+    title: "Interest History",
+    url: "/interest-history",
+    icon: TrendingUp,
   },
   {
     title: "Reports",
