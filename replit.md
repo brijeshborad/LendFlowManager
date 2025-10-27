@@ -42,6 +42,7 @@ Complete Drizzle schema with following tables:
 - **loans**: Loan records with principal, interest rates, terms
 - **payments**: Payment tracking with types (principal/interest/mixed)
 - **reminders**: Scheduled email reminders
+- **interest_entries**: Monthly interest calculation history
 - **email_logs**: Email activity tracking
 - **email_templates**: Customizable email templates
 - **audit_logs**: Security audit trail
@@ -54,6 +55,12 @@ All protected with authentication middleware:
 - `/api/loans/*` - CRUD operations for loans  
 - `/api/payments/*` - CRUD operations for payments
 - `/api/reminders/*` - Reminder management
+- `/api/interest-entries` - List all interest entries for user
+- `/api/interest-entries/loan/:loanId` - Get interest history for specific loan
+- `/api/interest-entries/loan/:loanId/outstanding` - Calculate outstanding interest
+- `/api/admin/generate-interest` - Manual trigger for monthly interest calculation
+- `/api/admin/send-reminders` - Manual trigger for email reminders
+- `/api/admin/scheduler-status` - Check reminder scheduler status
 - `/api/email-templates/*` - Email template management
 - `/api/email-logs` - Email activity logs
 - `/api/audit-logs` - Security audit trail
@@ -81,12 +88,49 @@ Reusable components with full interactivity:
 - `AddBorrowerModal` - Borrower creation form
 - `NotificationPanel` - Real-time notification dropdown
 - `Landing` - Marketing landing page
+- `InterestHistory` - View all monthly interest calculations
+- `AddLoanModal` - Loan creation form
 
-#### 6. Planned Features (Not Yet Implemented)
-- Email service integration (SendGrid/Resend)
-- Automated email reminder scheduling
-- Interest calculation engine (simple/compound)
-- File upload to object storage
+#### 6. Automated Monthly Interest & Email Reminders ✅
+**NEW - Fully Implemented October 27, 2024**
+
+**Interest Calculation System:**
+- Automatic monthly interest calculation based on loan start date
+- Support for both monthly and annual interest rate types
+- Interest entries tracked in dedicated `interest_entries` table
+- Historical interest tracking per loan
+- Outstanding interest calculation
+- Manual job trigger via API: `POST /api/admin/generate-interest`
+
+**Email Reminder Scheduler:**
+- Automated monthly scheduler runs on 1st of every month
+- Generates interest entries for all active loans
+- Sends email summary to all lenders with active loans
+- Beautiful HTML email templates with:
+  - Monthly interest breakdown per borrower
+  - Total interest earned
+  - Period dates and loan details
+- Manual trigger via API: `POST /api/admin/send-reminders`
+- Scheduler status check: `GET /api/admin/scheduler-status`
+
+**Interest History Page:**
+- View all monthly interest entries
+- Filter by borrower
+- See auto-generated vs manual entries
+- Summary statistics (total entries, total interest)
+- Export-ready data views
+
+**Email Service Integration:**
+- Running in mock mode for development/testing
+- Logs all email sends to `email_logs` table
+- To enable real emails: Set up SendGrid or Resend connector
+- Environment variables needed:
+  - `EMAIL_PROVIDER` (sendgrid/resend)
+  - `EMAIL_API_KEY`
+  - `EMAIL_FROM_ADDRESS`
+
+#### 7. Planned Features (Not Yet Implemented)
+- File upload to object storage for receipts/documents
 - PDF/Excel export functionality
 - Borrower statements generation
 - Advanced analytics and reporting
@@ -244,13 +288,11 @@ Server → Client:
 
 ## Known Issues / TODOs
 
-1. **Email Integration**: Need to set up SendGrid or Resend connector
+1. **Email Integration**: Currently in mock mode. To enable real emails, set up SendGrid or Resend connector and add environment variables (EMAIL_PROVIDER, EMAIL_API_KEY, EMAIL_FROM_ADDRESS)
 2. **File Uploads**: Need to integrate object storage for receipts/documents
-3. **Interest Calculation**: Engine not yet implemented (returns 0)
-4. **Reminder Scheduling**: Cron jobs/scheduler not set up
-5. **PDF Generation**: Statement export not implemented
-6. **Testing**: E2E tests need to be written
-7. **Production Deployment**: Need to test publishing workflow
+3. **PDF Generation**: Statement export not implemented
+4. **Testing**: E2E tests need to be written for new interest calculation features
+5. **Production Deployment**: Need to test publishing workflow
 
 ## User Preferences
 
@@ -259,6 +301,8 @@ None specified yet - this is a template project ready for customization.
 ## Recent Changes
 
 ### October 27, 2024
+
+**Session 1:**
 - Created complete database schema with Drizzle ORM
 - Implemented Replit Auth integration
 - Built all API routes with authentication
@@ -267,20 +311,43 @@ None specified yet - this is a template project ready for customization.
 - Designed and implemented all UI components
 - Configured proper routing with authentication checks
 - Added comprehensive audit logging
-- Integrated email service layer (SendGrid/Resend support) with mock mode
-- Built reminder service with automated email sending and template support
-- Added API routes for processing reminders (manual and automatic)
-- Started connecting frontend Dashboard to real APIs (in progress)
+
+**Session 2:**
+- Fixed Dashboard data flow (connected all real API queries)
+- Implemented working Borrowers page with add functionality
+- Implemented working Loans page with add functionality
+- Added AddBorrowerModal with TanStack Query mutations
+- Added AddLoanModal with borrower selection
+- Successfully tested end-to-end flow (auth → add borrowers → create loans)
+
+**Session 3 - Automated Interest & Reminders:**
+- ✅ Added `interest_entries` table to track monthly interest calculations
+- ✅ Built interest calculation service (`interestCalculationService.ts`)
+  - Calculates monthly interest based on loan start date
+  - Supports monthly and annual interest rate types
+  - Prevents duplicate entries for same period
+  - Provides interest history and outstanding interest calculation
+- ✅ Built email reminder scheduler (`reminderSchedulerService.ts`)
+  - Runs daily check for 1st of month
+  - Auto-generates interest entries
+  - Sends beautiful HTML email summaries to lenders
+  - Integrated with server startup
+- ✅ Added API routes for interest entries and admin triggers
+- ✅ Built Interest History page with summary statistics
+- ✅ Added navigation menu item for Interest History
+- ✅ Updated sidebar navigation
+- **Email Status**: Running in mock mode (logs to console + database). User opted not to set up Replit SendGrid connector. To enable real emails, manually add EMAIL_PROVIDER, EMAIL_API_KEY, and EMAIL_FROM_ADDRESS environment variables.
 
 ## Next Steps
 
-1. Integrate email service (SendGrid/Resend)
-2. Implement interest calculation engine
-3. Set up automated reminder scheduling
-4. Add file upload functionality
-5. Build reporting and export features
-6. Write end-to-end tests
-7. Deploy to production
+1. ~~Implement interest calculation engine~~ ✅ DONE
+2. ~~Set up automated reminder scheduling~~ ✅ DONE  
+3. Enable real email sending (add SendGrid/Resend credentials)
+4. Add file upload functionality for receipts/documents
+5. Build PDF/Excel export features for reports
+6. Write end-to-end tests for interest calculation flow
+7. Test the monthly scheduler on 1st of month
+8. Deploy to production
 
 ## Notes
 

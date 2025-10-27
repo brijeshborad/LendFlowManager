@@ -202,7 +202,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/loans", isAuthenticated, async (req: any, res: Response) => {
     try {
       const userId = req.user.claims.sub;
-      const validated = insertLoanSchema.parse({ ...req.body, userId });
+      // Convert startDate string to Date object
+      const loanData = {
+        ...req.body,
+        userId,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : new Date(),
+      };
+      const validated = insertLoanSchema.parse(loanData);
       const loan = await storage.createLoan(validated);
       
       await storage.createAuditLog({
