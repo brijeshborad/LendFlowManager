@@ -16,6 +16,7 @@ import InterestHistory from "@/pages/InterestHistory";
 import Reports from "@/pages/Reports";
 import Reminders from "@/pages/Reminders";
 import EmailTemplates from "@/pages/EmailTemplates";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -45,6 +46,7 @@ function Router() {
           <Route path="/reports" component={Reports} />
           <Route path="/reminders" component={Reminders} />
           <Route path="/templates" component={EmailTemplates} />
+          <Route path="/settings" component={Settings} />
         </>
       )}
       <Route component={NotFound} />

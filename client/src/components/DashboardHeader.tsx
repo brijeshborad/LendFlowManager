@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,12 +37,21 @@ interface Notification {
 export function DashboardHeader() {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
 
   const handleLogout = () => {
     // Clear React Query cache before logout
     queryClient.clear();
     // Redirect to logout endpoint which will handle session cleanup
     window.location.href = "/api/logout";
+  };
+
+  const navigateToSettings = (tab?: string) => {
+    if (tab) {
+      setLocation(`/settings?tab=${tab}`);
+    } else {
+      setLocation("/settings");
+    }
   };
 
   // Fetch notifications
@@ -225,11 +235,11 @@ export function DashboardHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem data-testid="menu-profile">
+              <DropdownMenuItem onClick={() => navigateToSettings("profile")} data-testid="menu-profile">
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </DropdownMenuItem>
-              <DropdownMenuItem data-testid="menu-preferences">
+              <DropdownMenuItem onClick={() => navigateToSettings("preferences")} data-testid="menu-preferences">
                 <Settings className="mr-2 h-4 w-4" />
                 Preferences
               </DropdownMenuItem>

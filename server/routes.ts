@@ -66,6 +66,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // User settings routes
+  app.get("/api/user/settings", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      res.json(user);
+    } catch (error: any) {
+      console.error("Error fetching user settings:", error);
+      res.status(500).json({ message: "Failed to fetch user settings" });
+    }
+  });
+
+  app.patch("/api/user/profile", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { firstName, lastName } = req.body;
+      const user = await storage.updateUserPreferences(userId, { firstName, lastName });
+      res.json(user);
+    } catch (error: any) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ message: "Failed to update profile" });
+    }
+  });
+
+  app.patch("/api/user/preferences", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { notificationPreferences, interestCalculationMethod, autoLogoutMinutes } = req.body;
+      const user = await storage.updateUserPreferences(userId, {
+        notificationPreferences,
+        interestCalculationMethod,
+        autoLogoutMinutes,
+      });
+      res.json(user);
+    } catch (error: any) {
+      console.error("Error updating preferences:", error);
+      res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
   // Notifications route
   app.get("/api/notifications", isAuthenticated, async (req: any, res: Response) => {
     try {
