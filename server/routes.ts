@@ -13,6 +13,13 @@ import {
   insertReminderSchema,
   insertEmailTemplateSchema,
 } from "@shared/schema";
+import {
+  getUserInterestEntries,
+  getInterestHistory,
+  generateMonthlyInterestEntries,
+  calculateOutstandingInterest,
+} from "./interestCalculationService";
+import { sendMonthlyInterestReminders, getSchedulerStatus } from "./reminderSchedulerService";
 
 const upload = multer({ dest: "uploads/" });
 
@@ -369,6 +376,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error deleting payment:", error);
       res.status(500).json({ message: "Failed to delete payment" });
+    }
+  });
+
+  // Interest Entry routes
+  app.get("/api/interest-entries", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await getUserInterestEntries(userId);
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Error fetching interest entries:", error);
+      res.status(500).json({ message: "Failed to fetch interest entries" });
+    }
+  });
+
+  app.get("/api/interest-entries/loan/:loanId", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const entries = await getInterestHistory(req.params.loanId);
+      res.json(entries);
+    } catch (error: any) {
+      console.error("Error fetching interest history:", error);
+      res.status(500).json({ message: "Failed to fetch interest history" });
+    }
+  });
+
+  app.get("/api/interest-entries/loan/:loanId/outstanding", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const outstanding = await calculateOutstandingInterest(req.params.loanId);
+      res.json({ outstandingInterest: outstanding });
+    } catch (error: any) {
+      console.error("Error calculating outstanding interest:", error);
+      res.status(500).json({ message: "Failed to calculate outstanding interest" });
+    }
+  });
+
+  // Admin/Job routes for interest calculation and reminders
+  app.post("/api/admin/generate-interest", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const result = await generateMonthlyInterestEntries();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error generating interest entries:", error);
+      res.status(500).json({ message: "Failed to generate interest entries" });
+    }
+  });
+
+  app.post("/api/admin/send-reminders", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const emailsSent = await sendMonthlyInterestReminders();
+      res.json({ emailsSent });
+    } catch (error: any) {
+      console.error("Error sending reminders:", error);
+      res.status(500).json({ message: "Failed to send reminders" });
+    }
+  });
+
+  app.get("/api/admin/scheduler-status", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const status = getSchedulerStatus();
+      res.json(status);
+    } catch (error: any) {
+      console.error("Error getting scheduler status:", error);
+      res.status(500).json({ message: "Failed to get scheduler status" });
     }
   });
 
