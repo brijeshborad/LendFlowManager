@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface AddBorrowerModalProps {
   open: boolean;
@@ -25,16 +28,76 @@ interface AddBorrowerModalProps {
 }
 
 export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [notes, setNotes] = useState("");
   const [contactMethod, setContactMethod] = useState("");
+
+  const createBorrowerMutation = useMutation({
+    mutationFn: async (data: { name: string; email: string; phone: string; address?: string; metadata?: any }) => {
+      const response = await apiRequest("POST", "/api/borrowers", data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Borrower added successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/borrowers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      resetForm();
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add borrower",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetForm = () => {
+    setName("");
+    setEmail("");
+    setPhone("");
+    setAddress("");
+    setNotes("");
+    setContactMethod("");
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Borrower added");
-    onClose();
+    
+    const metadata: any = {};
+    if (contactMethod) {
+      metadata.preferredContactMethod = contactMethod;
+    }
+    if (notes) {
+      metadata.notes = notes;
+    }
+
+    createBorrowerMutation.mutate({
+      name,
+      email,
+      phone,
+      address: address || undefined,
+      metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+    });
+  };
+
+  const handleClose = () => {
+    if (!createBorrowerMutation.isPending) {
+      resetForm();
+      onClose();
+    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl" data-testid="modal-add-borrower">
         <DialogHeader>
           <DialogTitle>Add New Borrower</DialogTitle>
@@ -52,7 +115,10 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                   id="borrower-name"
                   placeholder="Rajesh Kumar"
                   required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   data-testid="input-borrower-name"
+                  disabled={createBorrowerMutation.isPending}
                 />
               </div>
               <div className="space-y-2">
@@ -62,7 +128,10 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                   type="email"
                   placeholder="rajesh@example.com"
                   required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   data-testid="input-email"
+                  disabled={createBorrowerMutation.isPending}
                 />
               </div>
             </div>
@@ -75,12 +144,19 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                   type="tel"
                   placeholder="+91 98765 43210"
                   required
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   data-testid="input-phone"
+                  disabled={createBorrowerMutation.isPending}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contact-method">Preferred Contact Method</Label>
-                <Select value={contactMethod} onValueChange={setContactMethod}>
+                <Select 
+                  value={contactMethod} 
+                  onValueChange={setContactMethod}
+                  disabled={createBorrowerMutation.isPending}
+                >
                   <SelectTrigger id="contact-method" data-testid="select-contact-method">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
@@ -98,7 +174,10 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
               <Input
                 id="address"
                 placeholder="123 Main St, City, State"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
                 data-testid="input-address"
+                disabled={createBorrowerMutation.isPending}
               />
             </div>
 
@@ -108,17 +187,30 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                 id="borrower-notes"
                 placeholder="Additional information about the borrower..."
                 rows={3}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
                 data-testid="textarea-borrower-notes"
+                disabled={createBorrowerMutation.isPending}
               />
             </div>
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={handleClose} 
+              data-testid="button-cancel"
+              disabled={createBorrowerMutation.isPending}
+            >
               Cancel
             </Button>
-            <Button type="submit" data-testid="button-submit-borrower">
-              Add Borrower
+            <Button 
+              type="submit" 
+              data-testid="button-submit-borrower"
+              disabled={createBorrowerMutation.isPending}
+            >
+              {createBorrowerMutation.isPending ? "Adding..." : "Add Borrower"}
             </Button>
           </DialogFooter>
         </form>
