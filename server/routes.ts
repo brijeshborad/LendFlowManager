@@ -608,6 +608,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reports
+  app.get("/api/reports/loan-summary", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const loans = await storage.getLoans(userId);
+      const payments = await storage.getPayments(userId);
+      const borrowers = await storage.getBorrowers(userId);
+      const interestEntries = await getUserInterestEntries(userId);
+
+      const report = loans.map(loan => {
+        const borrower = borrowers.find(b => b.id === loan.borrowerId);
+        const loanPayments = payments.filter(p => p.loanId === loan.id);
+        const loanInterest = interestEntries.filter((i: any) => i.loanId === loan.id);
+        const totalPaid = loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
+        const totalInterest = loanInterest.reduce((sum: number, i: any) => sum + parseFloat(i.amount.toString()), 0);
+        const balance = parseFloat(loan.principalAmount.toString()) + totalInterest - totalPaid;
+
+        return {
+          loanId: loan.id,
+          borrowerName: borrower?.name || 'Unknown',
+          principalAmount: parseFloat(loan.principalAmount.toString()),
+          interestRate: parseFloat(loan.interestRate.toString()),
+          startDate: loan.startDate,
+          dueDate: null,
+          status: loan.status || 'active',
+          totalInterest,
+          totalPaid,
+          balance,
+          paymentCount: loanPayments.length,
+        };
+      });
+
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error fetching loan summary report:", error);
+      res.status(500).json({ message: "Failed to fetch loan summary report" });
+    }
+  });
+
+  app.get("/api/reports/payment-history", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const payments = await storage.getPayments(userId);
+      res.json(payments);
+    } catch (error: any) {
+      console.error("Error fetching payment history report:", error);
+      res.status(500).json({ message: "Failed to fetch payment history report" });
+    }
+  });
+
+  app.get("/api/reports/interest-earned", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const interestEntries = await getUserInterestEntries(userId);
+      
+      // Group by month
+      const monthlyData = interestEntries.reduce((acc: Record<string, { month: string; total: number; count: number }>, entry: any) => {
+        const date = new Date(entry.calculatedDate);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        if (!acc[monthKey]) {
+          acc[monthKey] = { month: monthKey, total: 0, count: 0 };
+        }
+        acc[monthKey].total += parseFloat(entry.amount.toString());
+        acc[monthKey].count += 1;
+        return acc;
+      }, {} as Record<string, { month: string; total: number; count: number }>);
+
+      const monthlyReport = Object.values(monthlyData).sort((a: any, b: any) => a.month.localeCompare(b.month));
+
+      res.json({
+        total: interestEntries.reduce((sum: number, e: any) => sum + parseFloat(e.amount.toString()), 0),
+        count: interestEntries.length,
+        monthly: monthlyReport,
+      });
+    } catch (error: any) {
+      console.error("Error fetching interest earned report:", error);
+      res.status(500).json({ message: "Failed to fetch interest earned report" });
+    }
+  });
+
+  app.get("/api/reports/borrower-summary", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const borrowers = await storage.getBorrowers(userId);
+      const loans = await storage.getLoans(userId);
+      const payments = await storage.getPayments(userId);
+      const interestEntries = await getUserInterestEntries(userId);
+
+      const report = borrowers.map(borrower => {
+        const borrowerLoans = loans.filter(l => l.borrowerId === borrower.id);
+        const totalPrincipal = borrowerLoans.reduce((sum, l) => sum + parseFloat(l.principalAmount.toString()), 0);
+        
+        let totalPaid = 0;
+        let totalInterest = 0;
+        
+        borrowerLoans.forEach(loan => {
+          const loanPayments = payments.filter(p => p.loanId === loan.id);
+          const loanInterest = interestEntries.filter((i: any) => i.loanId === loan.id);
+          totalPaid += loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
+          totalInterest += loanInterest.reduce((sum: number, i: any) => sum + parseFloat(i.amount.toString()), 0);
+        });
+
+        const balance = totalPrincipal + totalInterest - totalPaid;
+
+        return {
+          borrowerId: borrower.id,
+          borrowerName: borrower.name,
+          email: borrower.email,
+          phone: borrower.phone,
+          loanCount: borrowerLoans.length,
+          totalPrincipal,
+          totalInterest,
+          totalPaid,
+          balance,
+          activeLoans: borrowerLoans.filter(l => l.status === 'active').length,
+        };
+      });
+
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error fetching borrower summary report:", error);
+      res.status(500).json({ message: "Failed to fetch borrower summary report" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server setup
