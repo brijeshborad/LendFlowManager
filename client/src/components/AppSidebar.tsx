@@ -1,0 +1,105 @@
+import { Home, Users, Wallet, FileText, Settings, Bell, Mail } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarFooter,
+} from "@/components/ui/sidebar";
+
+const menuItems = [
+  {
+    title: "Dashboard",
+    url: "/",
+    icon: Home,
+  },
+  {
+    title: "Borrowers",
+    url: "/borrowers",
+    icon: Users,
+  },
+  {
+    title: "Loans",
+    url: "/loans",
+    icon: Wallet,
+  },
+  {
+    title: "Reports",
+    url: "/reports",
+    icon: FileText,
+  },
+];
+
+const reminderItems = [
+  {
+    title: "Reminders",
+    url: "/reminders",
+    icon: Bell,
+  },
+  {
+    title: "Email Templates",
+    url: "/templates",
+    icon: Mail,
+  },
+];
+
+export function AppSidebar() {
+  return (
+    <Sidebar>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main Menu</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild data-testid={`sidebar-${item.title.toLowerCase()}`}>
+                    <a href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Automation</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {reminderItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild data-testid={`sidebar-${item.title.toLowerCase()}`}>
+                    <a href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild data-testid="sidebar-settings">
+              <a href="/settings">
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </a>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
