@@ -4,6 +4,8 @@ import { WebSocketServer, WebSocket } from "ws";
 import multer from "multer";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
+import { emailService } from "./emailService";
+import { reminderService } from "./reminderService";
 import {
   insertBorrowerSchema,
   insertLoanSchema,
@@ -411,6 +413,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userAgent: req.get("user-agent"),
       });
 
+      // If sendImmediately is true, process the reminder right away
+      if (req.body.sendImmediately) {
+        await reminderService.processReminder(reminder.id, userId);
+      }
+
       broadcastToUser(userId, {
         type: "reminder_created",
         data: reminder,
@@ -420,6 +427,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error creating reminder:", error);
       res.status(400).json({ message: error.message || "Failed to create reminder" });
+    }
+  });
+
+  app.post("/api/reminders/:id/send", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const success = await reminderService.processReminder(req.params.id, userId);
+      
+      if (success) {
+        res.json({ message: "Reminder sent successfully" });
+      } else {
+        res.status(400).json({ message: "Failed to send reminder" });
+      }
+    } catch (error: any) {
+      console.error("Error sending reminder:", error);
+      res.status(500).json({ message: "Failed to send reminder" });
+    }
+  });
+
+  app.post("/api/reminders/process-pending", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.claims.sub;
+      const count = await reminderService.processPendingReminders(userId);
+      res.json({ message: `Processed ${count} pending reminders`, count });
+    } catch (error: any) {
+      console.error("Error processing pending reminders:", error);
+      res.status(500).json({ message: "Failed to process pending reminders" });
     }
   });
 

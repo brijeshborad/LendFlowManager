@@ -284,3 +284,4 @@ None specified yet - this is a template project ready for customization.
 - All financial amounts stored as DECIMAL(15,2) in database
 - WebSocket path is `/ws` (separate from Vite HMR WebSocket)
 - Design follows professional SaaS financial application patterns
+- **Email Service**: User opted not to use Replit's Resend integration. Using custom email service layer that supports both SendGrid and Resend via environment variables. Set `EMAIL_PROVIDER`, `EMAIL_API_KEY`, and `EMAIL_FROM_ADDRESS` to enable email functionality. Currently running in mock mode.
