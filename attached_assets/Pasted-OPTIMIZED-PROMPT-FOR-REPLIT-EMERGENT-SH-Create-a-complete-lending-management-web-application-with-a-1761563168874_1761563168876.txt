@@ -1,0 +1,894 @@
+OPTIMIZED PROMPT FOR REPLIT/EMERGENT.SH:
+Create a complete lending management web application with authentication, real-time notifications, and automated email reminders with the following specifications:
+Application Type
+Single-page React application with user authentication, persistent data storage, real-time notifications, and automated email reminder system
+Core Functionality
+1. Authentication & User Management
+Login/Signup System:
+
+Username or email
+Password (with show/hide toggle)
+"Remember me" option
+Forgot password functionality (security questions or email reset)
+
+User Profile Management:
+
+Name, email, phone
+Profile picture (optional)
+Change password option
+Email notification preferences
+Reminder settings configuration
+
+Security Features:
+
+Secure session management
+Auto-logout after inactivity (configurable timeout)
+Multiple user support (each user has their own isolated data)
+Optional: Add PIN/fingerprint lock for mobile devices
+
+
+2. Borrower & Loan Management
+Borrower Details:
+
+Add/edit/delete borrowers (name, contact, email, address, notes)
+Email address (required for automated reminders)
+Preferred contact method (Email/SMS/WhatsApp)
+Communication preferences
+
+Loan Management:
+
+Add multiple loans per borrower with fields:
+
+Principal amount (₹ in lakhs/crores)
+Interest rate (% per month or % per annum - let user choose)
+Start date
+Repayment terms (text field for custom conditions)
+Status dropdown (Active/Settled/Closed)
+Loan agreement document upload (optional)
+
+
+Each loan should have a unique ID
+Attach documents/images to loans (agreements, receipts)
+
+
+3. Flexible Payment Recording
+Payment Entry:
+
+Date of payment
+Amount received
+Payment type dropdown (Principal repayment / Interest payment / Partial interest / Mixed)
+Payment method (Cash/UPI/Bank Transfer/Cheque)
+Transaction reference (UPI ID, Cheque number, etc.)
+Receipt upload option
+Notes field (optional remarks)
+
+Payment Management:
+
+Payments can be added anytime, not monthly - completely flexible
+No fixed payment schedule
+Display complete payment history per loan with running balance
+Edit/delete payment entries with confirmation
+Mark payments as verified/unverified
+Real-time notification sent when payment is recorded
+
+
+4. Automatic Interest Calculations
+
+Calculate total interest accrued from start date to current date based on outstanding principal
+Calculate interest accrued from start date OR last interest payment date (whichever is later)
+When interest payment is recorded, reset the interest counter from that date
+Show "Interest Pending" amount for each loan (accrued but not yet paid)
+Auto-adjust outstanding principal when principal repayments are recorded
+Display both "Total Interest Earned" (paid) and "Total Interest Pending" (accrued but unpaid)
+Interest calculation considering partial payments and date ranges
+Support for both Simple and Compound interest (user setting)
+
+
+5. Dashboard Features with Real-Time Updates
+Real-Time Dashboard:
+
+WebSocket integration for live updates
+Real-time notification bell icon with unread count badge
+Live notification feed showing:
+
+Payment received alerts
+High pending interest warnings
+Upcoming payment reminders
+System notifications
+
+
+Auto-refresh data when notifications arrive
+
+Summary Cards with Live Updates:
+
+Total Amount Lent (all time)
+Total Outstanding Principal (current)
+Total Interest Received (paid to date)
+Total Interest Pending (accrued but not yet received)
+Total Amount Receivable (Outstanding + Pending Interest)
+Number of Active Borrowers
+Number of Active Loans
+All cards update in real-time when transactions occur
+
+Interactive Graphs & Visualizations:
+
+Real-time updating charts:
+
+Line chart: Interest accrual trend (last 6/12 months)
+Bar chart: Monthly interest received vs pending
+Pie chart: Portfolio distribution by borrower
+Area chart: Outstanding principal over time
+Donut chart: Payment method breakdown
+Column chart: Top 5 borrowers by outstanding amount
+
+
+Time-series graphs showing:
+
+Payment frequency patterns
+Interest collection efficiency
+Loan disbursement timeline
+Cash flow analysis (money in vs money out)
+
+
+Interactive tooltips with drill-down capability
+Date range selector for graphs (7 days, 1 month, 3 months, 6 months, 1 year, custom)
+Export graph as image (PNG/SVG)
+
+Borrower List with Live Status:
+
+Name and contact
+Total lent to them
+Outstanding principal
+Pending interest amount
+Last payment date and amount
+Days since last payment
+Live status indicators (updates in real-time)
+Quick action buttons (Add Payment, View Details, Contact, Send Reminder)
+
+Features:
+
+Sort and filter options (by amount, date, pending interest, status)
+Color-coded indicators for interest pending levels
+Recent activity feed (last 10 transactions) - updates in real-time
+Upcoming reminders/alerts section - live countdown timers
+
+
+6. Automated Email Reminder System
+Email Reminder Configuration:
+
+SMTP/Email Service Integration:
+
+Support for SendGrid, Mailgun, AWS SES, or SMTP server
+Email service credentials in settings
+Template customization for email content
+Sender name and email configuration
+
+
+
+Reminder Types:
+
+Payment Due Reminders:
+
+Send X days before expected payment date
+Customizable frequency (weekly, bi-weekly, monthly)
+Auto-send on specific dates
+
+
+Interest Pending Alerts:
+
+Automatic email when interest pending exceeds threshold
+Configurable thresholds (e.g., >2 months, >3 months, >6 months)
+Escalation reminders (gentle → firm → urgent)
+
+
+Outstanding Principal Reminders:
+
+Monthly statements via email
+Quarterly review emails
+
+
+Custom Reminder Schedules:
+
+Set specific dates for specific borrowers
+Recurring reminders (daily, weekly, monthly)
+One-time reminder option
+
+
+
+Email Templates:
+
+Professional HTML email templates:
+
+Payment reminder template
+Interest pending alert template
+Monthly statement template
+Overdue payment notice template
+Thank you for payment template
+
+
+Customizable placeholders:
+
+{borrower_name}, {amount}, {due_date}, {interest_pending}
+{loan_details}, {payment_history}, {contact_info}
+
+
+Brand customization:
+
+Add logo to emails
+Custom color scheme
+Footer with contact details
+Unsubscribe option
+
+
+
+Reminder Management:
+
+Reminder Dashboard:
+
+View all scheduled reminders
+See sent reminder history
+Track email open rates (if supported by email service)
+Track response/payment after reminder
+
+
+Manual Reminder Options:
+
+Send instant reminder to specific borrower
+Bulk send reminders to all overdue borrowers
+Preview email before sending
+Send test email to yourself
+
+
+Reminder Status Tracking:
+
+Scheduled, Sent, Delivered, Failed, Bounced
+Retry failed emails automatically
+Log all email activities
+
+
+
+Automated Reminder Rules:
+
+Rule-Based Automation:
+
+"If no payment in X days, send reminder"
+"If interest pending > ₹X, send alert"
+"Every 1st of month, send statement"
+"If loan status changes, notify borrower"
+
+
+Smart Reminder Logic:
+
+Don't send reminder if payment received today
+Skip reminder if borrower contacted recently
+Adjust reminder frequency based on borrower responsiveness
+Pause reminders for specific borrowers (vacation mode)
+
+
+
+Email Activity Log:
+
+Complete history of all emails sent
+Delivery status tracking
+Error logs for failed emails
+Analytics dashboard:
+
+Total emails sent
+Delivery rate
+Response rate (payments after reminders)
+Best performing reminder times
+
+
+
+
+7. Real-Time WebSocket Notification System
+WebSocket Integration:
+
+Socket.IO or native WebSocket implementation
+Real-time bidirectional communication
+Automatic reconnection on connection loss
+Connection status indicator on dashboard
+
+Real-Time Notification Features:
+
+Instant push notifications for:
+
+New payment recorded
+High interest pending alert (crosses threshold)
+Reminder sent to borrower
+Email delivery status (sent/failed)
+Loan status changed
+Document uploaded
+User login from new device (security alert)
+
+
+Notification Center:
+
+Dropdown panel showing recent notifications
+Unread notification count badge
+Mark as read/unread
+Archive notifications
+Filter by type (payments, reminders, alerts, system)
+
+
+Notification Preferences:
+
+Choose which events trigger notifications
+Desktop browser notifications (with permission)
+Sound alerts (toggleable)
+Notification frequency control
+
+
+Notification Actions:
+
+Click notification to navigate to relevant page
+Quick actions from notification (e.g., "View Payment", "Send Reminder")
+Dismiss or snooze notifications
+
+
+
+Live Dashboard Updates:
+
+Auto-update without page refresh:
+
+Summary cards update instantly
+Graphs redraw with new data
+Borrower list updates in real-time
+Activity feed shows new entries immediately
+
+
+Visual indicators for updates:
+
+Subtle animations when data changes
+Highlight newly added/updated rows
+Toast notifications for important updates
+
+
+Multi-device synchronization:
+
+Changes on one device reflect on all logged-in devices
+Real-time collaboration (if multiple users access same account)
+
+
+
+
+8. Interest Tracking & Reminders
+Interest Monitoring:
+
+Monthly view showing total interest accrued across all loans for current month
+Visual indicators for loans with high pending interest (e.g., >3 months unpaid)
+Timeline view showing when each borrower last paid
+Month-wise interest accrual breakdown per loan
+Highlight loans with no payments in last 60/90 days
+
+Custom Reminder System:
+
+Set reminders for specific borrowers
+Email notification integration (automated)
+SMS notification integration (optional - via Twilio/similar)
+WhatsApp notification (optional - via WhatsApp Business API)
+In-app notification center with real-time updates
+Dashboard alerts for overdue payments with action buttons
+
+
+9. Transaction Management
+Payment Entry:
+
+Easy "Add Payment" button for each loan
+Modal form with:
+
+Quick select for payment type
+Auto-calculated pending interest shown as reference
+Option to mark partial interest payment
+Payment method selection
+Notes field for payment details
+Receipt/proof upload
+
+
+Option to send payment confirmation email to borrower
+
+Transaction Operations:
+
+Edit/delete payment entries with audit trail
+Bulk payment entry option (if multiple people pay on same day)
+Payment receipt generation (printable/downloadable)
+Transaction search functionality
+Send "Thank You for Payment" email automatically
+
+
+10. Reports & Statements
+Borrower Statements:
+
+Individual borrower statement showing:
+
+Borrower details
+All loans given with dates
+All payments received (with dates, types, and amounts)
+Current outstanding principal
+Current pending interest
+Total interest paid to date
+Payment history timeline
+
+
+
+Report Generation:
+
+Date-range filter for transactions
+Export options:
+
+PDF statements (professional formatted)
+Excel/CSV export
+Print-friendly view
+
+
+Email statement directly to borrower
+Month-wise interest accrual report
+Year-end summary report (total interest earned in a year)
+Tax report (annual interest income)
+Portfolio performance analytics
+Email reminder effectiveness report
+
+Visual Reports:
+
+Graphical reports with real-time updates:
+
+Interest trends over time
+Payment patterns analysis
+Borrower comparison charts
+Portfolio health dashboard
+Cash flow projections
+
+
+
+
+11. Security & Privacy
+
+Password encryption (bcrypt or similar)
+Secure session tokens
+Data encryption for sensitive information
+User data isolation (each user sees only their data)
+Audit log for important actions (login, data changes, emails sent)
+Optional 2FA (Two-Factor Authentication)
+Data backup encryption
+Auto-logout on browser close option
+Secure email credentials storage (encrypted)
+API key management for third-party services
+
+
+Technical Stack
+Frontend:
+
+React with Hooks (useState, useEffect, useReducer, useContext, useRef)
+React Router for navigation (auth routes + protected routes)
+Tailwind CSS for modern, responsive styling
+React Context API + useReducer for global state management
+
+Data Persistence:
+
+IndexedDB (using Dexie.js library) for persistent storage - NO localStorage
+Separate IndexedDB databases per user for data isolation
+
+Real-Time Communication:
+
+Socket.IO client for WebSocket connections
+Real-time event handling and state updates
+
+Email Service Integration:
+
+Nodemailer (if using Node.js backend) or EmailJS (frontend-only)
+SendGrid SDK / Mailgun API / AWS SES SDK (choose one)
+Email queue management (optional - using Bull or similar)
+
+Charts & Visualization:
+
+Recharts or Chart.js for interactive graphs
+React-ApexCharts for advanced visualizations (optional)
+D3.js for custom visualizations (optional)
+
+Utilities:
+
+date-fns or dayjs for date calculations
+bcryptjs for password hashing
+react-hot-toast or react-toastify for notifications
+jsPDF for PDF generation
+react-icons for iconography
+axios for HTTP requests (email API calls)
+
+Additional Libraries:
+
+react-helmet for managing document head
+react-loading-skeleton for skeleton screens
+framer-motion for smooth animations
+
+
+UI/UX Requirements
+Design Principles:
+
+Modern, professional interface with clean design
+Login page with gradient background or professional imagery
+Sidebar navigation with user profile section
+Card-based layout for dashboard
+Real-time notification bell with animated badge
+Live updating graphs with smooth transitions
+
+Status Indicators:
+
+Green = Active, payments up to date
+Yellow = Active, interest pending >2 months
+Orange = Active, interest pending >4 months
+Red = Active, interest pending >6 months
+Gray = Settled/Closed
+Pulsing indicators for real-time updates
+
+Interactive Elements:
+
+Modal forms for adding/editing with smooth animations
+Confirmation dialogs for delete/critical actions
+Toast notifications for success/error/info messages
+Real-time notification toasts for incoming events
+Loading states and skeleton screens
+Comprehensive error handling with user-friendly messages
+
+Formatting:
+
+Indian number format (₹20,00,000 not ₹2,000,000)
+Date picker components for easy date selection
+Auto-save functionality where applicable
+Smooth page transitions
+Empty states with helpful illustrations
+Mobile-responsive navigation (hamburger menu)
+
+
+Data Persistence & Security
+
+All data stored in IndexedDB with encryption
+Separate database per user (user_id based isolation)
+Automatic data backup option (encrypted export)
+Import functionality to restore from backup
+No data loss on browser refresh/close
+Session persistence with secure tokens
+Clear data on logout (optional setting)
+Secure storage of email service credentials
+Encrypted API keys for third-party services
+
+
+Additional Features
+Search & Filter:
+
+Global search functionality (search across borrowers, amounts, dates, transactions)
+Advanced filters:
+
+By status, date range, amount range
+By pending interest range
+By payment method
+By last payment date
+By reminder status (sent/pending/failed)
+
+
+
+Customization:
+
+Dark mode toggle with preference saved per user
+Print-friendly borrower statements with logo
+Email borrower statement with one click
+WhatsApp share button for statements (opens WhatsApp with pre-filled message)
+Calculator widget for quick interest calculations
+Currency converter (if dealing with foreign currency)
+Multi-language support (English, Hindi - optional)
+
+Notification Center:
+
+Real-time notification feed with WebSocket
+Shows:
+
+Payment reminders sent
+High pending interest alerts
+Email delivery status
+System notifications
+Payment received confirmations
+
+
+Activity log showing recent actions
+
+
+Settings Panel
+User Profile Settings:
+
+Name, email, password change
+Profile picture upload
+Contact information
+
+App Preferences:
+
+Interest calculation method (Simple/Compound)
+Default interest rate
+Interest accrual frequency (Daily/Monthly)
+Currency format preferences
+Date format preferences
+Default payment method
+
+Email Configuration:
+
+Email service provider selection (SendGrid/Mailgun/SMTP)
+SMTP server settings:
+
+Host, port, username, password
+TLS/SSL options
+
+
+API key configuration for SendGrid/Mailgun
+Sender email and name
+Test email functionality (send test to verify setup)
+Email signature customization
+
+Reminder Settings:
+
+Enable/disable automated reminders
+Default reminder schedule:
+
+Days before payment due to send reminder
+Frequency of reminders (weekly, bi-weekly, monthly)
+
+
+Interest pending thresholds for alerts:
+
+Alert at 2 months, 3 months, 6 months
+Escalation schedule
+
+
+Reminder templates:
+
+Edit email subject and body
+Add custom variables
+Preview templates
+
+
+Quiet hours (don't send reminders during specific times)
+Borrower-specific reminder overrides
+
+Notification Preferences:
+
+Real-time notification settings:
+
+Enable desktop notifications
+Enable sound alerts
+Choose notification sound
+
+
+Email notification preferences:
+
+Get notified when reminders are sent
+Get notified on payment received
+Get notified on high pending interest
+
+
+WebSocket connection settings:
+
+Auto-reconnect on disconnect
+Connection timeout settings
+
+
+
+Security Settings:
+
+Change password
+Enable/disable 2FA
+Auto-logout timeout
+PIN lock for app
+View active sessions
+Email alert on login from new device
+
+Data Management:
+
+Export all data (encrypted JSON/CSV)
+Import data
+Clear all data (with confirmation)
+Backup reminder email history
+Clear notification history
+
+Theme Settings:
+
+Light/Dark mode
+Custom accent colors
+Font size preferences
+
+
+Protected Routes Structure
+/ (redirect to /login if not authenticated)
+/login
+/signup
+/forgot-password
+
+/dashboard (protected - requires authentication) - **with real-time updates**
+/borrowers (protected)
+/borrower/:id (protected - borrower details) - **with reminder management**
+/loans (protected)
+/loan/:id (protected - loan details)
+/payments (protected - all payments)
+/reports (protected) - **with interactive graphs**
+/reminders (protected) - **email reminder dashboard**
+/notifications (protected) - **notification center**
+/settings (protected) - **includes email configuration**
+/profile (protected)
+
+Deliverables
+
+Fully functional React application with authentication system
+Real-time WebSocket notification system with live dashboard updates
+Automated email reminder system with configurable schedules
+Interactive graphs and charts with real-time data updates
+Clean component architecture with reusable components
+Protected route implementation
+Proper state management with Context API
+Well-commented code for key business logic
+Authentication flow with token management
+Responsive design working on all devices
+Error boundaries for graceful error handling
+Loading states and skeleton screens
+Comprehensive input validation
+Email service integration with error handling
+WebSocket connection management with reconnection logic
+README with:
+
+Setup instructions
+Feature documentation
+Email service configuration guide
+WebSocket setup instructions
+User guide
+API documentation (if applicable)
+
+
+
+
+First-Time User Experience
+
+Signup form with validation
+Welcome tutorial/onboarding (optional walkthrough)
+Email configuration wizard (step-by-step setup)
+Sample data option (to see how app works)
+Help section with FAQs
+Video tutorial on setting up email reminders
+
+
+Example Use Case with Email & Real-Time Features
+User: Amit Patel (amit@example.com)
+Login: Secure authentication with real-time session sync
+Borrower: Rajesh Kumar
+
+Contact: +91-9876543210
+Email: rajesh.kumar@example.com
+Loan: ₹20,00,000 @ 1% per month, Start: 05-May-2024, Status: Active
+
+Transactions:
+
+05-Jun-2024: ₹25,000 (Interest payment) - UPI
+
+Real-time notification sent to dashboard
+"Thank you for payment" email sent to Rajesh automatically
+
+
+15-Aug-2024: ₹50,000 (Mixed - ₹30,000 interest + ₹20,000 principal) - Cash
+
+Dashboard graphs update instantly
+Payment confirmation displayed in real-time
+
+
+
+Current Status:
+
+Outstanding Principal: ₹19,80,000
+Interest pending since 15-Aug-2024: Auto-calculated daily
+Automated reminder scheduled: If no payment by 15-Oct-2024, send email reminder
+Dashboard alert: "Interest pending for 72 days" (yellow indicator)
+
+Email Reminders Sent:
+
+10-Oct-2024: "Payment Reminder - Interest Due" (sent automatically)
+
+Real-time notification: "Reminder email sent to Rajesh Kumar"
+Email tracking: Delivered successfully
+
+
+20-Oct-2024: "Urgent - Interest Overdue" (escalation email sent)
+
+Dashboard alert: "Escalation reminder sent"
+
+
+
+Real-Time Dashboard View:
+
+Notification bell shows: "3 unread notifications"
+Recent activity feed updates live:
+
+"Payment received from Priya Sharma - ₹60,000" (2 mins ago)
+"Reminder sent to Rajesh Kumar" (1 hour ago)
+"Interest alert: Loan #1234 crossed 3-month threshold" (Today)
+
+
+Graphs show live data:
+
+Interest pending graph shows upward trend for Rajesh's loan
+Payment frequency chart updates when new payment recorded
+
+
+
+
+Interest Calculation Logic
+
+Use compound interest or simple interest (toggle option in settings)
+Calculate interest on outstanding principal only
+For mixed payments: reduce principal first, then apply to interest
+For monthly rate: Interest = Principal × Rate × (Days/30) for precise calculations
+Show daily interest accrual rate in loan details
+Consider payment dates for accurate interest calculation
+Trigger email reminder when interest crosses threshold (e.g., >₹50,000)
+
+
+Build Requirements
+Build this as a complete, production-ready application with:
+
+Professional UI/UX with real-time updates
+Robust authentication and security measures
+Fully functional email reminder system
+Real-time WebSocket notification system
+Interactive, live-updating graphs and charts
+Comprehensive error handling
+Intuitive user experience
+Seamless email service integration
+Reliable WebSocket connection management
+
+The app should handle 20-30 active loans per user efficiently with smooth performance, support multiple users with complete data isolation, send hundreds of automated emails reliably, and provide real-time updates across all connected devices.
+
+Key Additions Summary
+✅ Real-Time WebSocket Notifications:
+
+Live dashboard updates without refresh
+Instant notification bell with unread count
+Real-time activity feed
+Multi-device synchronization
+Desktop push notifications
+
+✅ Automated Email Reminder System:
+
+Configurable email service integration (SendGrid/Mailgun/SMTP)
+Automated reminder schedules (payment due, interest pending)
+Custom email templates with placeholders
+Email activity tracking and analytics
+Manual and bulk reminder options
+Smart reminder logic with rules engine
+
+✅ Interactive Real-Time Graphs:
+
+Live updating charts (line, bar, pie, area, donut)
+Time-series visualizations with drill-down
+Date range selectors and filters
+Export graphs as images
+Portfolio analytics dashboards
+Payment pattern analysis
+
+✅ Enhanced Dashboard:
+
+Real-time summary cards
+Live borrower status indicators
+Animated updates and transitions
+Connection status indicator
+Notification center integration
+
+✅ Email Configuration Panel:
+
+Email service setup wizard
+Template customization
+Test email functionality
+Sender configuration
+Delivery tracking
+
+✅ Reminder Management Dashboard:
+
+View scheduled reminders
+Track sent emails
+Monitor delivery status
+Analyze reminder effectiveness
+Manage reminder rules
+
+
+This prompt now includes comprehensive real-time notification capabilities via WebSockets, a fully-featured automated email reminder system with customizable templates and schedules, and interactive graphs that update live on the dashboard.
