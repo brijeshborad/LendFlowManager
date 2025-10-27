@@ -103,7 +103,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "create_borrower",
         entityType: "borrower",
         entityId: borrower.id,
-        details: { borrowerName: borrower.name },
+        changes: { borrowerName: borrower.name },
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -130,7 +130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "update_borrower",
         entityType: "borrower",
         entityId: borrower.id,
-        details: { changes: req.body },
+        changes: req.body,
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -234,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "create_loan",
         entityType: "loan",
         entityId: loan.id,
-        details: { amount: loan.principalAmount, borrowerId: loan.borrowerId },
+        changes: { amount: loan.principalAmount, borrowerId: loan.borrowerId },
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -261,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "update_loan",
         entityType: "loan",
         entityId: loan.id,
-        details: { changes: req.body },
+        changes: req.body,
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -328,7 +328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "add_payment",
         entityType: "payment",
         entityId: payment.id,
-        details: { amount: payment.amount, type: payment.paymentType, loanId: payment.loanId },
+        changes: { amount: payment.amount, type: payment.paymentType, loanId: payment.loanId },
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -360,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "update_payment",
         entityType: "payment",
         entityId: payment.id,
-        details: { changes: req.body },
+        changes: req.body,
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });
@@ -502,7 +502,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "create_reminder",
         entityType: "reminder",
         entityId: reminder.id,
-        details: { type: reminder.reminderType, borrowerId: reminder.borrowerId },
+        changes: { type: reminder.reminderType, borrowerId: reminder.borrowerId },
         ipAddress: req.ip,
         userAgent: req.get("user-agent"),
       });

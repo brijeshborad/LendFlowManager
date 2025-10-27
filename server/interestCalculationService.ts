@@ -15,6 +15,26 @@ export interface InterestCalculation {
 }
 
 /**
+ * Safely add months to a date, handling end-of-month edge cases
+ * For example: Jan 31 + 1 month = Feb 28/29 (not Mar 3)
+ */
+function addMonthsSafe(date: Date, monthsToAdd: number): Date {
+  const result = new Date(date);
+  const originalDay = result.getDate();
+  
+  // Add the months
+  result.setMonth(result.getMonth() + monthsToAdd);
+  
+  // If the day changed (overflow), set to last day of target month
+  if (result.getDate() !== originalDay) {
+    // Go to the 0th day of next month (which is last day of current month)
+    result.setDate(0);
+  }
+  
+  return result;
+}
+
+/**
  * Calculate monthly interest for a single loan
  */
 export function calculateMonthlyInterest(
@@ -50,7 +70,6 @@ export async function getLoansNeedingInterestCalculation(
       const currentDate = new Date();
       
       // Calculate which month period we should be calculating
-      const periodStart = new Date(startDate);
       const monthsSinceStart = 
         (targetMonth.getFullYear() - startDate.getFullYear()) * 12 +
         (targetMonth.getMonth() - startDate.getMonth());
@@ -58,12 +77,9 @@ export async function getLoansNeedingInterestCalculation(
       // Skip if this month is before the loan start date
       if (monthsSinceStart < 0) continue;
       
-      // Set period start to the correct month
-      periodStart.setMonth(startDate.getMonth() + monthsSinceStart);
-      periodStart.setFullYear(startDate.getFullYear() + Math.floor((startDate.getMonth() + monthsSinceStart) / 12));
-      
-      const periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      // Use safe month addition to avoid skipping months for 29th-31st dates
+      const periodStart = addMonthsSafe(startDate, monthsSinceStart);
+      const periodEnd = addMonthsSafe(startDate, monthsSinceStart + 1);
       
       // Check if we already have an entry for this period
       const existingEntry = await db
@@ -244,11 +260,9 @@ export async function generateHistoricalInterestEntries(
 
     // Generate an interest entry for each month from start to now
     for (let i = 0; i <= monthsDiff; i++) {
-      const periodStart = new Date(loanStartDate);
-      periodStart.setMonth(loanStartDate.getMonth() + i);
-      
-      const periodEnd = new Date(periodStart);
-      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      // Use safe month addition to avoid skipping months for 29th-31st dates
+      const periodStart = addMonthsSafe(loanStartDate, i);
+      const periodEnd = addMonthsSafe(loanStartDate, i + 1);
       
       // Check if entry already exists for this period
       const existingEntry = await db
