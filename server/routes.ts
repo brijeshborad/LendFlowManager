@@ -18,6 +18,7 @@ import {
   getInterestHistory,
   generateMonthlyInterestEntries,
   calculateOutstandingInterest,
+  generateHistoricalInterestEntries,
 } from "./interestCalculationService";
 import { sendMonthlyInterestReminders, getSchedulerStatus } from "./reminderSchedulerService";
 
@@ -210,6 +211,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const validated = insertLoanSchema.parse(loanData);
       const loan = await storage.createLoan(validated);
+      
+      // Generate historical interest entries if the loan has a past start date
+      try {
+        const result = await generateHistoricalInterestEntries(
+          loan.id,
+          userId,
+          loan.borrowerId,
+          loan.startDate,
+          loan.principalAmount,
+          loan.interestRate,
+          loan.interestRateType as 'monthly' | 'annual'
+        );
+        console.log(`Generated ${result.created} historical interest entries for loan ${loan.id}`);
+      } catch (interestError) {
+        console.error("Error generating historical interest entries:", interestError);
+        // Don't fail the loan creation if interest generation fails
+      }
       
       await storage.createAuditLog({
         userId,
