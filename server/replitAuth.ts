@@ -8,9 +8,9 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
-if (!process.env.REPLIT_DOMAINS) {
-  throw new Error("Environment variable REPLIT_DOMAINS not provided");
-}
+// if (!process.env.REPLIT_DOMAINS) {
+//   throw new Error("Environment variable REPLIT_DOMAINS not provided");
+// }
 
 const getOidcConfig = memoize(
   async () => {
@@ -143,9 +143,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   }
 
   try {
-    const config = await getOidcConfig();
-    const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
-    updateUserSession(user, tokenResponse);
+    // const config = await getOidcConfig();
+    // const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
+    // updateUserSession(user, tokenResponse);
     return next();
   } catch (error) {
     res.status(401).json({ message: "Unauthorized" });
