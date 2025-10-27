@@ -96,26 +96,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
+    // MySQL uses onDuplicateKeyUpdate instead of onConflictDoUpdate
+    await db
       .insert(users)
       .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
+      .onDuplicateKeyUpdate({
         set: {
-          ...userData,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
           updatedAt: new Date(),
         },
-      })
-      .returning();
+      });
+    
+    // Fetch and return the user since MySQL doesn't support .returning()
+    const user = await this.getUser(userData.id!);
+    if (!user) {
+      throw new Error("Failed to upsert user");
+    }
     return user;
   }
 
   async updateUserPreferences(userId: string, preferences: Partial<UpsertUser>): Promise<User> {
-    const [user] = await db
+    await db
       .update(users)
       .set({ ...preferences, updatedAt: new Date() })
-      .where(eq(users.id, userId))
-      .returning();
+      .where(eq(users.id, userId));
+    
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error("User not found after update");
+    }
     return user;
   }
 
@@ -133,16 +145,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBorrower(borrower: InsertBorrower): Promise<Borrower> {
-    const [newBorrower] = await db.insert(borrowers).values(borrower).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(borrowers).values({ ...borrower, id });
+    
+    // Fetch the newly created borrower
+    const [newBorrower] = await db
+      .select()
+      .from(borrowers)
+      .where(eq(borrowers.id, id))
+      .limit(1);
+    
+    if (!newBorrower) {
+      throw new Error("Failed to create borrower");
+    }
     return newBorrower;
   }
 
   async updateBorrower(id: string, userId: string, borrower: Partial<InsertBorrower>): Promise<Borrower> {
-    const [updated] = await db
+    await db
       .update(borrowers)
       .set({ ...borrower, updatedAt: new Date() })
-      .where(and(eq(borrowers.id, id), eq(borrowers.userId, userId)))
-      .returning();
+      .where(and(eq(borrowers.id, id), eq(borrowers.userId, userId)));
+    
+    const updated = await this.getBorrower(id, userId);
+    if (!updated) {
+      throw new Error("Borrower not found after update");
+    }
     return updated;
   }
 
@@ -169,16 +198,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createLoan(loan: InsertLoan): Promise<Loan> {
-    const [newLoan] = await db.insert(loans).values(loan).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(loans).values({ ...loan, id } as any);
+    
+    // Fetch the newly created loan
+    const [newLoan] = await db
+      .select()
+      .from(loans)
+      .where(eq(loans.id, id))
+      .limit(1);
+    
+    if (!newLoan) {
+      throw new Error("Failed to create loan");
+    }
     return newLoan;
   }
 
   async updateLoan(id: string, userId: string, loan: Partial<InsertLoan>): Promise<Loan> {
-    const [updated] = await db
+    await db
       .update(loans)
-      .set({ ...loan, updatedAt: new Date() })
-      .where(and(eq(loans.id, id), eq(loans.userId, userId)))
-      .returning();
+      .set({ ...loan, updatedAt: new Date() } as any)
+      .where(and(eq(loans.id, id), eq(loans.userId, userId)));
+    
+    const updated = await this.getLoan(id, userId);
+    if (!updated) {
+      throw new Error("Loan not found after update");
+    }
     return updated;
   }
 
@@ -208,16 +254,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [newPayment] = await db.insert(payments).values(payment).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(payments).values({ ...payment, id });
+    
+    // Fetch the newly created payment
+    const [newPayment] = await db
+      .select()
+      .from(payments)
+      .where(eq(payments.id, id))
+      .limit(1);
+    
+    if (!newPayment) {
+      throw new Error("Failed to create payment");
+    }
     return newPayment;
   }
 
   async updatePayment(id: string, userId: string, payment: Partial<InsertPayment>): Promise<Payment> {
-    const [updated] = await db
+    await db
       .update(payments)
       .set({ ...payment, updatedAt: new Date() })
-      .where(and(eq(payments.id, id), eq(payments.userId, userId)))
-      .returning();
+      .where(and(eq(payments.id, id), eq(payments.userId, userId)));
+    
+    const updated = await this.getPayment(id, userId);
+    if (!updated) {
+      throw new Error("Payment not found after update");
+    }
     return updated;
   }
 
@@ -247,23 +310,33 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReminder(reminder: InsertReminder): Promise<Reminder> {
-    const [newReminder] = await db.insert(reminders).values({
-      ...reminder,
-      metadata: reminder.metadata as any, // Cast to handle Drizzle JSON type
-    }).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(reminders).values({ ...reminder, id } as any);
+    
+    // Fetch the newly created reminder
+    const [newReminder] = await db
+      .select()
+      .from(reminders)
+      .where(eq(reminders.id, id))
+      .limit(1);
+    
+    if (!newReminder) {
+      throw new Error("Failed to create reminder");
+    }
     return newReminder;
   }
 
   async updateReminder(id: string, userId: string, reminder: Partial<InsertReminder>): Promise<Reminder> {
-    const updateData: any = { ...reminder, updatedAt: new Date() };
-    if (reminder.metadata) {
-      updateData.metadata = reminder.metadata as any; // Cast to handle Drizzle JSON type
-    }
-    const [updated] = await db
+    await db
       .update(reminders)
-      .set(updateData)
-      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
-      .returning();
+      .set({ ...reminder, updatedAt: new Date() } as any)
+      .where(and(eq(reminders.id, id), eq(reminders.userId, userId)));
+    
+    const updated = await this.getReminder(id, userId);
+    if (!updated) {
+      throw new Error("Reminder not found after update");
+    }
     return updated;
   }
 
@@ -285,7 +358,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmailLog(emailLog: InsertEmailLog): Promise<EmailLog> {
-    const [newLog] = await db.insert(emailLogs).values(emailLog).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(emailLogs).values({ ...emailLog, id });
+    
+    // Fetch the newly created email log
+    const [newLog] = await db
+      .select()
+      .from(emailLogs)
+      .where(eq(emailLogs.id, id))
+      .limit(1);
+    
+    if (!newLog) {
+      throw new Error("Failed to create email log");
+    }
     return newLog;
   }
 
@@ -311,7 +397,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEmailTemplate(template: InsertEmailTemplate): Promise<EmailTemplate> {
-    const [newTemplate] = await db.insert(emailTemplates).values(template).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(emailTemplates).values({ ...template, id } as any);
+    
+    // Fetch the newly created template
+    const [newTemplate] = await db
+      .select()
+      .from(emailTemplates)
+      .where(eq(emailTemplates.id, id))
+      .limit(1);
+    
+    if (!newTemplate) {
+      throw new Error("Failed to create email template");
+    }
     return newTemplate;
   }
 
@@ -320,11 +419,15 @@ export class DatabaseStorage implements IStorage {
     userId: string,
     template: Partial<InsertEmailTemplate>
   ): Promise<EmailTemplate> {
-    const [updated] = await db
+    await db
       .update(emailTemplates)
-      .set({ ...template, updatedAt: new Date() })
-      .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)))
-      .returning();
+      .set({ ...template, updatedAt: new Date() } as any)
+      .where(and(eq(emailTemplates.id, id), eq(emailTemplates.userId, userId)));
+    
+    const updated = await this.getEmailTemplate(id, userId);
+    if (!updated) {
+      throw new Error("Email template not found after update");
+    }
     return updated;
   }
 
@@ -336,7 +439,20 @@ export class DatabaseStorage implements IStorage {
 
   // Audit log operations
   async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
-    const [newLog] = await db.insert(auditLogs).values(log).returning();
+    // Generate UUID before insert since MySQL doesn't return it
+    const id = crypto.randomUUID();
+    await db.insert(auditLogs).values({ ...log, id });
+    
+    // Fetch the newly created audit log
+    const [newLog] = await db
+      .select()
+      .from(auditLogs)
+      .where(eq(auditLogs.id, id))
+      .limit(1);
+    
+    if (!newLog) {
+      throw new Error("Failed to create audit log");
+    }
     return newLog;
   }
 
