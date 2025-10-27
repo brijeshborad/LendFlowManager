@@ -247,14 +247,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createReminder(reminder: InsertReminder): Promise<Reminder> {
-    const [newReminder] = await db.insert(reminders).values(reminder).returning();
+    const [newReminder] = await db.insert(reminders).values({
+      ...reminder,
+      metadata: reminder.metadata as any, // Cast to handle Drizzle JSON type
+    }).returning();
     return newReminder;
   }
 
   async updateReminder(id: string, userId: string, reminder: Partial<InsertReminder>): Promise<Reminder> {
+    const updateData: any = { ...reminder, updatedAt: new Date() };
+    if (reminder.metadata) {
+      updateData.metadata = reminder.metadata as any; // Cast to handle Drizzle JSON type
+    }
     const [updated] = await db
       .update(reminders)
-      .set({ ...reminder, updatedAt: new Date() })
+      .set(updateData)
       .where(and(eq(reminders.id, id), eq(reminders.userId, userId)))
       .returning();
     return updated;
