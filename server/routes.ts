@@ -66,6 +66,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Notifications route
+  app.get("/api/notifications", isAuthenticated, async (req: any, res: Response) => {
+    try {
+      // For now, return mock notifications
+      // TODO: Implement proper notification storage and retrieval
+      const notifications = [
+        {
+          id: "1",
+          title: "Payment Received",
+          message: "Payment of ₹50,000 received from John Doe",
+          type: "payment",
+          read: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
+        },
+        {
+          id: "2",
+          title: "Interest Generated",
+          message: "Monthly interest of ₹5,000 calculated for Loan #1234",
+          type: "interest",
+          read: false,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        },
+        {
+          id: "3",
+          title: "Reminder Sent",
+          message: "Payment reminder sent to Jane Smith",
+          type: "reminder",
+          read: true,
+          createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+        },
+      ];
+      res.json(notifications);
+    } catch (error: any) {
+      console.error("Error fetching notifications:", error);
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
   // Borrower routes
   app.get("/api/borrowers", isAuthenticated, async (req: any, res: Response) => {
     try {

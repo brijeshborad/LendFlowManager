@@ -237,3 +237,33 @@ Drawing inspiration from **Stripe Dashboard** (professional financial UI), **Lin
 **Document Previews**: Thumbnail preview (128px) with file type icon overlay for uploaded agreements/receipts.
 
 **No large hero images** - this is a data-focused application dashboard, not a marketing site.
+
+---
+
+## Dark Mode Support
+
+**Theme System**:
+- Automatic theme toggle with localStorage persistence
+- Smooth theme transitions using CSS classes (.light and .dark)
+- Theme toggle button in header (Sun icon for dark mode, Moon icon for light mode)
+
+**Dark Mode Colors** (Configured in index.css):
+- Background: Deep slate (222 47% 11%)
+- Foreground: Light gray (210 20% 98%)
+- Card backgrounds: Slightly lighter than background (222 47% 13%)
+- Borders: Subtle gray (217 19% 20%)
+- Primary: Same vibrant blue in both modes (217 91% 60%)
+- Muted elements: Darker in dark mode for proper contrast
+
+**Implementation Guidelines**:
+- All components automatically adapt to theme via CSS variables
+- Use semantic color tokens (bg-background, text-foreground) instead of hardcoded colors
+- Charts use adjusted colors for dark mode visibility
+- Shadows are more prominent in dark mode for depth perception
+- All interactive elements maintain proper contrast ratios in both modes
+
+**Header Design**:
+- Backdrop blur effect (backdrop-blur) for modern glassmorphism
+- Semi-transparent background (bg-background/95) overlaying content
+- Gradient logo badge from primary to primary/80
+- Theme toggle positioned next to notifications for easy access
