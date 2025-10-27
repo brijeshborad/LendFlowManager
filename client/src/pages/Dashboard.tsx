@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, TrendingUp, Users, Banknote, Plus, UserPlus } from "lucide-react";
+import { DollarSign, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { BorrowerCard } from "@/components/BorrowerCard";
 import { InterestChart } from "@/components/InterestChart";
@@ -8,9 +8,11 @@ import { ActivityFeed } from "@/components/ActivityFeed";
 import { AddPaymentModal } from "@/components/AddPaymentModal";
 import { AddBorrowerModal } from "@/components/AddBorrowerModal";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Borrower, Loan, Payment } from "@shared/schema";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
+import type { Borrower, Loan, Payment, InterestEntry } from "@shared/schema";
 import avatar1 from '@assets/generated_images/Professional_male_avatar_headshot_3c69c06f.png';
 import avatar2 from '@assets/generated_images/Professional_female_avatar_headshot_d7c69081.png';
 import avatar3 from '@assets/generated_images/Professional_diverse_avatar_headshot_7572a5aa.png';
@@ -25,6 +27,7 @@ interface DashboardStats {
 export default function Dashboard() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [borrowerModalOpen, setBorrowerModalOpen] = useState(false);
+  const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
 
   // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
@@ -44,6 +47,11 @@ export default function Dashboard() {
   // Fetch all payments
   const { data: payments = [] } = useQuery<Payment[]>({
     queryKey: ['/api/payments'],
+  });
+
+  // Fetch interest entries
+  const { data: interestEntries = [] } = useQuery<InterestEntry[]>({
+    queryKey: ['/api/interest-entries'],
   });
 
   // Generate dynamic chart data from last 6 months of payments
@@ -141,9 +149,92 @@ export default function Dashboard() {
       .slice(0, 8);
   }, [payments, loans, borrowers]);
 
+  // Calculate loan status distribution for pie chart
+  const loanStatusData = useMemo(() => {
+    const statusCounts = loans.reduce((acc, loan) => {
+      const status = loan.status || 'active';
+      acc[status] = (acc[status] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      name: status.charAt(0).toUpperCase() + status.slice(1),
+      value: count,
+      color: status === 'active' ? '#3B82F6' : status === 'settled' ? '#10B981' : '#EF4444',
+    }));
+  }, [loans]);
+
+  // Calculate monthly interest earned for area chart
+  const monthlyInterestData = useMemo(() => {
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months: { [key: string]: number } = {};
+    
+    // Initialize last 6 months
+    const today = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const key = `${monthNames[date.getMonth()]}`;
+      months[key] = 0;
+    }
+
+    // Aggregate interest entries by month
+    interestEntries.forEach(entry => {
+      const entryDate = new Date(entry.periodEnd);
+      const monthKey = monthNames[entryDate.getMonth()];
+      if (months[monthKey] !== undefined) {
+        months[monthKey] += parseFloat(entry.interestAmount);
+      }
+    });
+
+    return Object.entries(months).map(([month, amount]) => ({
+      month,
+      interest: Math.round(amount),
+    }));
+  }, [interestEntries]);
+
+  // Calculate additional metrics
+  const additionalMetrics = useMemo(() => {
+    const totalLoans = loans.length;
+    const avgLoanSize = totalLoans > 0 
+      ? loans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0) / totalLoans 
+      : 0;
+    
+    const avgInterestRate = totalLoans > 0
+      ? loans.reduce((sum, loan) => sum + parseFloat(loan.interestRate), 0) / totalLoans
+      : 0;
+    
+    const totalInterestEarned = interestEntries.reduce((sum, entry) => sum + parseFloat(entry.interestAmount), 0);
+    
+    return {
+      avgLoanSize,
+      avgInterestRate,
+      totalInterestEarned,
+    };
+  }, [loans, interestEntries]);
+
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
     return `₹${(num / 100000).toFixed(1)}L`;
+  };
+
+  const handleViewDetails = (borrowerId: string) => {
+    // Navigate to borrower details page
+    window.location.href = `/borrowers?id=${borrowerId}`;
+  };
+
+  const handleAddPayment = (borrowerId: string) => {
+    setSelectedBorrowerId(borrowerId);
+    setPaymentModalOpen(true);
+  };
+
+  const handleSendReminder = (borrowerId: string) => {
+    // Navigate to reminders page with borrower pre-selected
+    window.location.href = `/reminders?borrowerId=${borrowerId}`;
+  };
+
+  const handleQuickPayment = () => {
+    setSelectedBorrowerId(null); // No pre-selected borrower
+    setPaymentModalOpen(true);
   };
 
   const avatars = [avatar1, avatar2, avatar3];
@@ -162,7 +253,7 @@ export default function Dashboard() {
             <UserPlus className="h-4 w-4 mr-2" />
             Add Borrower
           </Button>
-          <Button variant="outline" onClick={() => setPaymentModalOpen(true)} data-testid="button-quick-payment">
+          <Button variant="outline" onClick={handleQuickPayment} data-testid="button-quick-payment">
             <Plus className="h-4 w-4 mr-2" />
             Quick Payment
           </Button>
@@ -210,6 +301,51 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* Additional Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Average Loan Size</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono" data-testid="text-avg-loan-size">
+              ₹{additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Across {loans.length} loans
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Average Interest Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono" data-testid="text-avg-interest-rate">
+              {additionalMetrics.avgInterestRate.toFixed(2)}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Per month
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Interest Earned</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono text-green-600" data-testid="text-total-interest-earned">
+              ₹{additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {interestEntries.length} interest entries
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {borrowersLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Skeleton className="lg:col-span-2 h-96" />
@@ -236,6 +372,87 @@ export default function Dashboard() {
               />
             </div>
             <ActivityFeed activities={activities} />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PieChartIcon className="h-5 w-5" />
+                  Loan Status Distribution
+                </CardTitle>
+                <CardDescription>Breakdown of loans by status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loanStatusData.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    No loan data available
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={loanStatusData}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {loanStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Monthly Interest Earned
+                </CardTitle>
+                <CardDescription>Interest accumulated over the last 6 months</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {monthlyInterestData.every(d => d.interest === 0) ? (
+                  <div className="h-64 flex items-center justify-center text-muted-foreground">
+                    No interest data available
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={monthlyInterestData}>
+                      <defs>
+                        <linearGradient id="colorInterest" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Interest']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="interest" 
+                        stroke="#10B981" 
+                        fillOpacity={1} 
+                        fill="url(#colorInterest)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           <div>
@@ -294,6 +511,9 @@ export default function Dashboard() {
                               Math.floor((Date.now() - new Date(lastPayment.paymentDate).getTime()) / (1000 * 60 * 60 * 24))
                               : 0}
                             status={borrower.status as 'active' | 'overdue' | 'settled'}
+                            onViewDetails={handleViewDetails}
+                            onAddPayment={handleAddPayment}
+                            onSendReminder={handleSendReminder}
                           />
                         );
                       })}
@@ -311,7 +531,14 @@ export default function Dashboard() {
         </>
       )}
 
-      <AddPaymentModal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} />
+      <AddPaymentModal 
+        open={paymentModalOpen} 
+        onClose={() => {
+          setPaymentModalOpen(false);
+          setSelectedBorrowerId(null);
+        }}
+        preSelectedBorrowerId={selectedBorrowerId}
+      />
       <AddBorrowerModal open={borrowerModalOpen} onClose={() => setBorrowerModalOpen(false)} />
     </div>
   );

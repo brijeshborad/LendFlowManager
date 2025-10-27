@@ -20,6 +20,9 @@ interface BorrowerCardProps {
   };
   daysSincePayment: number;
   status: "active" | "overdue" | "settled";
+  onViewDetails?: (borrowerId: string) => void;
+  onAddPayment?: (borrowerId: string) => void;
+  onSendReminder?: (borrowerId: string) => void;
 }
 
 export function BorrowerCard({
@@ -34,6 +37,9 @@ export function BorrowerCard({
   lastPayment,
   daysSincePayment,
   status,
+  onViewDetails,
+  onAddPayment,
+  onSendReminder,
 }: BorrowerCardProps) {
   const getInitials = (name: string) => {
     return name
@@ -118,15 +124,29 @@ export function BorrowerCard({
             </div>
 
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" data-testid={`button-view-${id}`}>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => onViewDetails?.(id)}
+                data-testid={`button-view-${id}`}
+              >
                 <Eye className="h-4 w-4 mr-1.5" />
                 View Details
               </Button>
-              <Button size="sm" data-testid={`button-add-payment-${id}`}>
+              <Button 
+                size="sm" 
+                onClick={() => onAddPayment?.(id)}
+                data-testid={`button-add-payment-${id}`}
+              >
                 <Plus className="h-4 w-4 mr-1.5" />
                 Add Payment
               </Button>
-              <Button size="sm" variant="secondary" data-testid={`button-send-reminder-${id}`}>
+              <Button 
+                size="sm" 
+                variant="secondary" 
+                onClick={() => onSendReminder?.(id)}
+                data-testid={`button-send-reminder-${id}`}
+              >
                 <Send className="h-4 w-4 mr-1.5" />
                 Send Reminder
               </Button>

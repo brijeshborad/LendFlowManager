@@ -3,6 +3,21 @@
 ## Overview
 LendingPro is a comprehensive web application designed for professional lending management. It provides tools for tracking loans, borrowers, and payments, offering automated email reminders, analytical dashboards, and comprehensive financial reports. The system aims to streamline lending operations, enhance financial oversight, and improve communication with borrowers. Its core capabilities include secure user authentication, real-time updates, automated interest calculation and reminder systems, and multi-dimensional reporting with data visualization.
 
+## Recent Changes
+
+### Dashboard Enhancements (October 27, 2025)
+- **Interactive Borrower Cards:** Added working buttons for View Details, Add Payment, and Send Reminder on all borrower cards
+- **Enhanced Payment Modal:** Updated Quick Payment feature to include borrower and loan selection dropdowns with proper validation
+- **New Visualizations:** 
+  - Loan Status Distribution pie chart showing breakdown of active/settled/overdue loans
+  - Monthly Interest Earned area chart displaying interest trends over the last 6 months
+- **Additional Metrics:** Added three new metric cards displaying:
+  - Average Loan Size across all loans
+  - Average Interest Rate per month
+  - Total Interest Earned from all interest entries
+- **Professional Styling:** All monetary values use monospace font (JetBrains Mono) for perfect alignment per design guidelines
+- **Comprehensive Reports:** Four professional report types with data visualization on Reports page
+
 ## User Preferences
 None specified yet - this is a template project ready for customization.
 
