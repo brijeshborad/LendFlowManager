@@ -292,7 +292,7 @@ export default function Dashboard() {
                             } : undefined}
                             daysSincePayment={lastPayment ? 
                               Math.floor((Date.now() - new Date(lastPayment.paymentDate).getTime()) / (1000 * 60 * 60 * 24))
-                              : undefined}
+                              : 0}
                             status={borrower.status as 'active' | 'overdue' | 'settled'}
                           />
                         );
