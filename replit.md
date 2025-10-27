@@ -267,6 +267,10 @@ None specified yet - this is a template project ready for customization.
 - Designed and implemented all UI components
 - Configured proper routing with authentication checks
 - Added comprehensive audit logging
+- Integrated email service layer (SendGrid/Resend support) with mock mode
+- Built reminder service with automated email sending and template support
+- Added API routes for processing reminders (manual and automatic)
+- Started connecting frontend Dashboard to real APIs (in progress)
 
 ## Next Steps
 
