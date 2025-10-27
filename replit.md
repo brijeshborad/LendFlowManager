@@ -5,6 +5,27 @@ LendingPro is a comprehensive web application designed for professional lending 
 
 ## Recent Changes
 
+### UI Improvements - Dark Mode & Header Redesign (October 27, 2025)
+- **Dark Mode Support:** Implemented comprehensive dark mode with ThemeProvider
+  - SSR-safe implementation with proper window guards for non-browser environments
+  - Theme toggle button with localStorage persistence
+  - All components use semantic color tokens that auto-adapt to theme
+  - Smooth transitions between light and dark modes
+- **Header Redesign:** Complete overhaul with modern, professional aesthetic
+  - Gradient logo badge with glassmorphism backdrop blur effect
+  - Professional subtitle "Professional Lending Management"
+  - Improved spacing and layout with better visual hierarchy
+  - Integrated theme toggle in header
+- **Functional Notifications:** Real notification system with popover UI
+  - New API endpoint `/api/notifications` (currently returns mock data)
+  - Notification bell with unread count badge
+  - Popover showing notification list with icons and relative timestamps
+  - Three notification types: payment, interest, reminder
+- **Improved Logout Flow:** Fixed to properly clear session and redirect
+  - Uses correct GET `/api/logout` endpoint
+  - Clears React Query cache before redirect
+  - Proper session cleanup via Replit Auth
+
 ### Dashboard Enhancements (October 27, 2025)
 - **Interactive Borrower Cards:** Added working buttons for View Details, Add Payment, and Send Reminder on all borrower cards
 - **Enhanced Payment Modal:** Updated Quick Payment feature to include borrower and loan selection dropdowns with proper validation
@@ -29,13 +50,15 @@ LendingPro is a full-stack web application.
 -   **Routing:** Wouter.
 -   **Data Fetching:** TanStack Query (React Query v5).
 -   **UI Library:** Shadcn/UI with Tailwind CSS for a modern, professional look.
+-   **Theme System:** Dark mode support with ThemeProvider, SSR-safe localStorage persistence, seamless light/dark switching.
 -   **Data Visualization:** Recharts for interactive analytics and financial reports (line charts for interest trends, bar charts for borrower comparisons).
 -   **Real-time:** WebSocket client for notifications and live updates.
 -   **Icons:** Lucide React.
 -   **Design System:**
-    -   **Colors:** Primary Blue (#3B82F6), Green for success, Orange for warning, Red for danger. Chart colors are Tailwind-defined.
+    -   **Colors:** Primary Blue (#3B82F6), Green for success, Orange for warning, Red for danger. Chart colors are Tailwind-defined. All colors adapt to dark mode via semantic tokens.
     -   **Typography:** Inter for UI, JetBrains Mono for financial figures.
     -   **Components:** Follows Shadcn/UI patterns, uses `hover-elevate` and `active-elevate-2` utilities, with `data-testid` attributes for interactive elements. Cards use subtle elevation.
+    -   **Header:** Modern glassmorphism design with gradient logo, backdrop blur, and integrated controls.
 
 **Key Features:**
 -   **Comprehensive Reports:** Four professional report types with data visualization:
@@ -58,9 +81,9 @@ LendingPro is a full-stack web application.
     -   **Interest Calculation System:** Automatically calculates monthly interest based on loan start date, supporting monthly/annual rates. Tracks historical interest in `interest_entries` table. Generates historical entries for loans with past start dates, handling month-end complexities (e.g., February for Jan 31st loans).
     -   **Email Reminder Scheduler:** Automated monthly scheduler (1st of month) to generate interest entries, and send HTML email summaries to lenders with active loans.
 -   **API Routes:**
-    -   **Authentication:** `/api/auth/*`
+    -   **Authentication:** `/api/auth/*`, `/api/logout` (GET - Replit Auth logout)
     -   **CRUD Operations:** `/api/borrowers/*`, `/api/loans/*`, `/api/payments/*`, `/api/reminders/*`, `/api/email-templates/*`.
-    -   **Data Retrieval:** `/api/interest-entries/*`, `/api/email-logs`, `/api/audit-logs`, `/api/dashboard/stats`.
+    -   **Data Retrieval:** `/api/interest-entries/*`, `/api/email-logs`, `/api/audit-logs`, `/api/dashboard/stats`, `/api/notifications` (mock data).
     -   **Reports:** `/api/reports/loan-summary`, `/api/reports/payment-history`, `/api/reports/interest-earned`, `/api/reports/borrower-summary`.
     -   **Admin Triggers:** `/api/admin/generate-interest`, `/api/admin/send-reminders`, `/api/admin/scheduler-status`.
 -   **Database Schema (Drizzle ORM):** Includes `users`, `borrowers`, `loans`, `payments`, `reminders`, `interest_entries`, `email_logs`, `email_templates`, `audit_logs`, and `sessions` tables.
