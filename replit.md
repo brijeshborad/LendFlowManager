@@ -5,6 +5,16 @@ LendingPro is a comprehensive web application designed for professional lending 
 
 ## Recent Changes
 
+### Authentication Migration - Username/Password System (October 27, 2025)
+- **Complete Authentication Overhaul:** Replaced Replit Auth with local username/password authentication
+  - Added username and password fields to users table
+  - Implemented bcrypt password hashing for security
+  - Created registration system allowing new users to sign up
+  - Built login/register forms with tabs on landing page
+  - Session-based authentication using PostgreSQL session store
+  - All user-facing endpoints properly sanitize responses (password never sent to client)
+  - Updated all API routes to use new authentication system
+
 ### UI Improvements - Dark Mode & Header Redesign (October 27, 2025)
 - **Dark Mode Support:** Implemented comprehensive dark mode with ThemeProvider
   - SSR-safe implementation with proper window guards for non-browser environments
@@ -21,10 +31,6 @@ LendingPro is a comprehensive web application designed for professional lending 
   - Notification bell with unread count badge
   - Popover showing notification list with icons and relative timestamps
   - Three notification types: payment, interest, reminder
-- **Improved Logout Flow:** Fixed to properly clear session and redirect
-  - Uses correct GET `/api/logout` endpoint
-  - Clears React Query cache before redirect
-  - Proper session cleanup via Replit Auth
 
 ### Dashboard Enhancements (October 27, 2025)
 - **Interactive Borrower Cards:** Added working buttons for View Details, Add Payment, and Send Reminder on all borrower cards
@@ -73,7 +79,7 @@ LendingPro is a full-stack web application.
 **Backend:**
 -   **Framework:** Express.js with TypeScript.
 -   **Database:** PostgreSQL (Neon-backed) managed with Drizzle ORM.
--   **Authentication:** Replit Auth (OpenID Connect) for secure login (Google, GitHub, email/password). Secure session management via PostgreSQL session store.
+-   **Authentication:** Local username/password authentication with bcrypt password hashing. Passport.js with passport-local strategy. Secure session management via PostgreSQL session store. User registration and login system.
 -   **Real-time:** WebSocket Server (`ws` package).
 -   **File Uploads:** Multer.
 -   **Session Management:** Passport.js.
@@ -81,7 +87,7 @@ LendingPro is a full-stack web application.
     -   **Interest Calculation System:** Automatically calculates monthly interest based on loan start date, supporting monthly/annual rates. Tracks historical interest in `interest_entries` table. Generates historical entries for loans with past start dates, handling month-end complexities (e.g., February for Jan 31st loans).
     -   **Email Reminder Scheduler:** Automated monthly scheduler (1st of month) to generate interest entries, and send HTML email summaries to lenders with active loans.
 -   **API Routes:**
-    -   **Authentication:** `/api/auth/*`, `/api/logout` (GET - Replit Auth logout)
+    -   **Authentication:** `/api/register` (POST), `/api/login` (POST), `/api/logout` (POST), `/api/auth/user` (GET)
     -   **CRUD Operations:** `/api/borrowers/*`, `/api/loans/*`, `/api/payments/*`, `/api/reminders/*`, `/api/email-templates/*`.
     -   **Data Retrieval:** `/api/interest-entries/*`, `/api/email-logs`, `/api/audit-logs`, `/api/dashboard/stats`, `/api/notifications` (mock data).
     -   **Reports:** `/api/reports/loan-summary`, `/api/reports/payment-history`, `/api/reports/interest-earned`, `/api/reports/borrower-summary`.
@@ -93,6 +99,6 @@ LendingPro is a full-stack web application.
 
 ## External Dependencies
 -   **PostgreSQL:** Primary database (Neon-backed).
--   **Replit Auth:** For user authentication (OpenID Connect).
+-   **bcryptjs:** For secure password hashing (local authentication).
 -   **SendGrid/Resend:** Supported email providers for real email sending (requires environment variables `EMAIL_PROVIDER`, `EMAIL_API_KEY`, `EMAIL_FROM_ADDRESS`). Currently runs in mock mode for development.
 -   **WebSocket:** For real-time communication between server and client.

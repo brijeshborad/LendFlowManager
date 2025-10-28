@@ -1,5 +1,5 @@
 import { SummaryCard } from '../SummaryCard';
-import { DollarSign, TrendingUp, Users, Banknote } from "lucide-react";
+import { LucideIndianRupee, TrendingUp, Users, Banknote } from "lucide-react";
 
 export default function SummaryCardExample() {
   return (
@@ -8,7 +8,7 @@ export default function SummaryCardExample() {
         title="Total Amount Lent"
         value="₹45.2L"
         subValue="All time"
-        icon={DollarSign}
+        icon={LucideIndianRupee}
         iconColor="bg-blue-500"
       />
       <SummaryCard

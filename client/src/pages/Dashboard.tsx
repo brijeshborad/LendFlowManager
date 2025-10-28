@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { DollarSign, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon } from "lucide-react";
+import { LucideIndianRupee, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { BorrowerCard } from "@/components/BorrowerCard";
 import { InterestChart } from "@/components/InterestChart";
@@ -270,9 +270,9 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <SummaryCard
             title="Total Amount Lent"
-            value={stats?.totalLent || "₹0"}
+            value={formatCurrency(stats?.totalLent || 0) || "₹0"}
             subValue="All time"
-            icon={DollarSign}
+            icon={LucideIndianRupee}
             iconColor="bg-blue-500"
             data-testid="card-total-lent"
           />

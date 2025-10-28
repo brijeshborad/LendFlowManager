@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { DollarSign, TrendingUp, Users, FileText } from "lucide-react";
+import { LucideIndianRupee, TrendingUp, Users, FileText } from "lucide-react";
 import { format } from "date-fns";
 
 type LoanSummaryItem = {
@@ -68,8 +68,14 @@ export default function Reports() {
   });
 
   const formatCurrency = (amount: number | string) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+      const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+
+      return new Intl.NumberFormat('en-IN', {
+          style: 'currency',
+          currency: 'INR',
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+      }).format(num);
   };
 
   const getStatusBadge = (status: string) => {
@@ -105,7 +111,7 @@ export default function Reports() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Loaned</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <LucideIndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold font-mono" data-testid="text-total-loaned">
@@ -135,7 +141,7 @@ export default function Reports() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Received</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <LucideIndianRupee className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-semibold font-mono" data-testid="text-total-received">
