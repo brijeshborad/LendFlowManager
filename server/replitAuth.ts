@@ -112,7 +112,7 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.get("/api/logout", (req, res) => {
+  /*app.get("/api/logout", (req, res) => {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {
@@ -121,7 +121,7 @@ export async function setupAuth(app: Express) {
         }).href
       );
     });
-  });
+  });*/
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {

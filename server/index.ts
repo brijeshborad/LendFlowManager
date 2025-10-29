@@ -76,6 +76,7 @@ app.use((req, res, next) => {
 
     server.listen(port, host, () => {
         log(`serving on port ${port}`);
+        log(`Site Running on http://127.0.0.1:${port}`);
         startReminderScheduler();
     });
 })();
