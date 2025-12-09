@@ -54,14 +54,16 @@ export default function Dashboard() {
     queryKey: ['/api/interest-entries'],
   });
 
-  // Generate dynamic chart data from last 6 months of payments
+  const [chartTimeRange, setChartTimeRange] = useState(6);
+
+  // Generate dynamic chart data based on selected time range
   const chartData = useMemo(() => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const months: { [key: string]: { received: number; pending: number } } = {};
     
-    // Initialize last 6 months
+    // Initialize months based on time range
     const today = new Date();
-    for (let i = 5; i >= 0; i--) {
+    for (let i = chartTimeRange - 1; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = `${monthNames[date.getMonth()]}`;
       months[key] = { received: 0, pending: 0 };
@@ -77,7 +79,8 @@ export default function Dashboard() {
     });
 
     // Calculate pending interest (simplified - from outstanding principal)
-    const totalOutstanding = parseFloat(stats?.totalOutstanding || '0');
+    const totalOutstandingStr = stats?.totalOutstanding?.replace(/[^0-9.-]/g, '') || '0';
+    const totalOutstanding = parseFloat(totalOutstandingStr) || 0;
     const monthlyPending = totalOutstanding * 0.01; // Approximate 1% monthly
     
     return Object.entries(months).map(([month, data]) => ({
@@ -85,7 +88,7 @@ export default function Dashboard() {
       received: Math.round(data.received),
       pending: Math.round(monthlyPending),
     }));
-  }, [payments, stats]);
+  }, [payments, stats, chartTimeRange]);
 
   // Generate dynamic activity feed from recent payments and loans
   const activities = useMemo(() => {
@@ -214,7 +217,8 @@ export default function Dashboard() {
 
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    return `₹${(num / 100000).toFixed(1)}L`;
+    if (isNaN(num) || num === 0) return '₹0';
+    return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
   };
 
   const handleViewDetails = (borrowerId: string) => {
@@ -363,15 +367,19 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" style={{ height: '500px' }}>
+            <div className="lg:col-span-2 h-full">
               <InterestChart
-                title="Payment Trends (Last 6 Months)"
+                title={`Payment Trends (Last ${chartTimeRange === 1 ? '1 Month' : chartTimeRange === 3 ? '3 Months' : chartTimeRange === 6 ? '6 Months' : '1 Year'})`}
                 data={chartData}
+                timeRange={chartTimeRange}
+                onTimeRangeChange={setChartTimeRange}
                 onExport={() => console.log('Export chart')}
               />
             </div>
-            <ActivityFeed activities={activities} />
+            <div className="h-full">
+              <ActivityFeed activities={activities} />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -483,10 +491,28 @@ export default function Dashboard() {
                         const borrowerPayments = payments.filter((p) => 
                           borrowerLoans.some((l) => l.id === p.loanId)
                         );
+                        const borrowerInterest = interestEntries.filter((i) => i.borrowerId === borrower.id);
                         
-                        const totalLent = borrowerLoans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0);
-                        const totalPaid = borrowerPayments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-                        const outstanding = totalLent - totalPaid;
+                        const totalLent = borrowerLoans.reduce((sum, loan) => sum + (parseFloat(loan.principalAmount) || 0), 0);
+                        const totalInterestGenerated = borrowerInterest.reduce((sum, entry) => sum + (parseFloat(entry.interestAmount) || 0), 0);
+                        
+                        // Calculate payments allocation
+                        let principalPaid = 0;
+                        let interestPaid = 0;
+                        
+                        borrowerPayments.forEach(payment => {
+                          const amount = parseFloat(payment.amount) || 0;
+                          // Always apply payment to interest first, then principal
+                          const pendingInterestAtTime = totalInterestGenerated - interestPaid;
+                          const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
+                          const toPrincipal = amount - toInterest;
+                          interestPaid += toInterest;
+                          principalPaid += toPrincipal;
+                        });
+                        
+                        const outstanding = totalLent - principalPaid;
+                        const pendingInterest = totalInterestGenerated - interestPaid;
+                        const totalPaidAmount = borrowerPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
                         
                         const lastPayment = borrowerPayments.sort((a, b) => 
                           new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
@@ -502,7 +528,10 @@ export default function Dashboard() {
                             avatar={avatars[index % 3]}
                             totalLent={formatCurrency(totalLent)}
                             outstanding={formatCurrency(outstanding)}
-                            pendingInterest="₹0"
+                            interestEarned={`₹${totalInterestGenerated.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+                            pendingInterest={`₹${pendingInterest.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+                            totalPaid={`₹${totalPaidAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+                            paymentCount={borrowerPayments.length}
                             lastPayment={lastPayment ? {
                               date: new Date(lastPayment.paymentDate).toISOString().split('T')[0],
                               amount: `₹${parseFloat(lastPayment.amount).toLocaleString('en-IN')}`

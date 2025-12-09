@@ -161,6 +161,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    // Debug route for borrower calculations
+    app.get("/api/debug/borrower/:borrowerId", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const borrowerId = req.params.borrowerId;
+            
+            const borrower = await storage.getBorrower(borrowerId, userId);
+            const borrowerLoans = await storage.getLoans(userId, borrowerId);
+            const allPayments = await storage.getPayments(userId);
+            const borrowerPayments = allPayments.filter(p => 
+                borrowerLoans.some(l => l.id === p.loanId)
+            );
+            const interestEntries = await getUserInterestEntries(userId);
+            const borrowerInterest = interestEntries.filter((i: any) => i.borrowerId === borrowerId);
+            
+            const totalLent = borrowerLoans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0);
+            const principalPaid = borrowerPayments
+                .filter(p => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+            const outstanding = totalLent - principalPaid;
+            
+            const totalInterestGenerated = borrowerInterest.reduce((sum: number, entry: any) => sum + parseFloat(entry.interestAmount), 0);
+            const interestPaid = borrowerPayments
+                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+            const pendingInterest = totalInterestGenerated - interestPaid;
+            
+            res.json({
+                borrower: borrower?.name,
+                loans: borrowerLoans.map(l => ({ id: l.id, principal: l.principalAmount, rate: l.interestRate })),
+                payments: borrowerPayments.map(p => ({ date: p.paymentDate, amount: p.amount, type: p.paymentType })),
+                interestEntries: borrowerInterest.map((i: any) => ({ amount: i.interestAmount, period: i.periodStart })),
+                calculations: {
+                    totalLent,
+                    principalPaid,
+                    outstanding,
+                    totalInterestGenerated,
+                    interestPaid,
+                    pendingInterest
+                }
+            });
+        } catch (error: any) {
+            console.error("Error in debug:", error);
+            res.status(500).json({message: "Debug failed"});
+        }
+    });
+
     // Borrower routes
     app.get("/api/borrowers", isAuthenticated, async (req: any, res: Response) => {
         try {

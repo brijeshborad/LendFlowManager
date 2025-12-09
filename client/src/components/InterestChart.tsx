@@ -19,45 +19,51 @@ interface InterestChartProps {
     received: number;
     pending: number;
   }>;
+  timeRange?: number;
+  onTimeRangeChange?: (range: number) => void;
   onExport?: () => void;
 }
 
-export function InterestChart({ title, data, onExport }: InterestChartProps) {
+export function InterestChart({ title, data, timeRange = 6, onTimeRangeChange, onExport }: InterestChartProps) {
   return (
-    <Card data-testid="card-interest-chart">
-      <CardHeader>
+    <Card className="h-full flex flex-col" data-testid="card-interest-chart">
+      <CardHeader className="flex-shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-semibold">{title}</CardTitle>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 text-xs">
               <Button
-                variant="ghost"
+                variant={timeRange === 1 ? "default" : "ghost"}
                 size="sm"
                 className="h-8 text-xs"
+                onClick={() => onTimeRangeChange?.(1)}
                 data-testid="button-timerange-1m"
               >
                 1M
               </Button>
               <Button
-                variant="ghost"
+                variant={timeRange === 3 ? "default" : "ghost"}
                 size="sm"
                 className="h-8 text-xs"
+                onClick={() => onTimeRangeChange?.(3)}
                 data-testid="button-timerange-3m"
               >
                 3M
               </Button>
               <Button
-                variant="default"
+                variant={timeRange === 6 ? "default" : "ghost"}
                 size="sm"
                 className="h-8 text-xs"
+                onClick={() => onTimeRangeChange?.(6)}
                 data-testid="button-timerange-6m"
               >
                 6M
               </Button>
               <Button
-                variant="ghost"
+                variant={timeRange === 12 ? "default" : "ghost"}
                 size="sm"
                 className="h-8 text-xs"
+                onClick={() => onTimeRangeChange?.(12)}
                 data-testid="button-timerange-1y"
               >
                 1Y
@@ -74,8 +80,8 @@ export function InterestChart({ title, data, onExport }: InterestChartProps) {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={300}>
+      <CardContent className="flex-1">
+        <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis

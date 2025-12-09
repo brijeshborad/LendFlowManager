@@ -44,12 +44,12 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
   };
 
   return (
-    <Card data-testid="card-activity-feed">
-      <CardHeader>
+    <Card className="flex flex-col h-full" data-testid="card-activity-feed">
+      <CardHeader className="flex-shrink-0">
         <CardTitle className="text-lg font-semibold">Recent Activity</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
+      <CardContent className="flex-1 overflow-y-auto max-h-[400px]">
+        <div className="space-y-4 pr-2">
           {activities.map((activity, index) => (
             <div
               key={activity.id}

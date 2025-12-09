@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { UserPlus, Mail, Phone, MapPin } from "lucide-react";
+import { UserPlus, Mail, Phone, MapPin, ArrowLeft } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,11 +11,69 @@ import type { Borrower } from "@shared/schema";
 
 export default function Borrowers() {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [, setLocation] = useLocation();
+  const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
 
   const { data: borrowers = [], isLoading } = useQuery<Borrower[]>({
     queryKey: ['/api/borrowers'],
   });
+  
+  const { data: loans = [] } = useQuery({
+    queryKey: ['/api/loans'],
+  });
+  
+  const { data: payments = [] } = useQuery({
+    queryKey: ['/api/payments'],
+  });
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) setSelectedBorrowerId(id);
+  }, []);
+  
+  const selectedBorrower = borrowers.find(b => b.id === selectedBorrowerId);
+  const borrowerLoans = loans.filter((l: any) => l.borrowerId === selectedBorrowerId);
+  const borrowerPayments = payments.filter((p: any) => borrowerLoans.some((l: any) => l.id === p.loanId));
 
+  if (selectedBorrower) {
+    return (
+      <div className="p-8 space-y-6">
+        <Button variant="ghost" onClick={() => setSelectedBorrowerId(null)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Borrowers
+        </Button>
+        <div>
+          <h1 className="text-3xl font-semibold">{selectedBorrower.name}</h1>
+          <p className="text-muted-foreground mt-1">{selectedBorrower.email} • {selectedBorrower.phone}</p>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Payment History</h2>
+          </CardHeader>
+          <CardContent>
+            {borrowerPayments.length === 0 ? (
+              <p className="text-muted-foreground">No payments yet</p>
+            ) : (
+              <div className="space-y-2">
+                {borrowerPayments.map((payment: any) => (
+                  <div key={payment.id} className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <p className="font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
+                      <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{new Date(payment.paymentDate).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   return (
     <div className="p-8 space-y-6">
       <div className="flex items-center justify-between">
@@ -51,7 +110,7 @@ export default function Borrowers() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {borrowers.map((borrower) => (
-            <Card key={borrower.id} className="hover-elevate" data-testid={`card-borrower-${borrower.id}`}>
+            <Card key={borrower.id} className="hover-elevate cursor-pointer" onClick={() => setSelectedBorrowerId(borrower.id)} data-testid={`card-borrower-${borrower.id}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

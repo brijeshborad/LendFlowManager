@@ -7,6 +7,7 @@ import {
   emailLogs,
   emailTemplates,
   auditLogs,
+  interestEntries,
   type User,
   type UpsertUser,
   type Borrower,
@@ -375,11 +376,9 @@ export class DatabaseStorage implements IStorage {
   // Analytics operations
   async getDashboardStats(userId: string): Promise<{
     totalLent: string;
-    outstandingPrincipal: string;
-    interestReceived: string;
-    interestPending: string;
+    totalOutstanding: string;
+    totalPendingInterest: string;
     activeBorrowers: number;
-    activeLoans: number;
   }> {
     // Get all loans for the user
     const userLoans = await this.getLoans(userId);
@@ -390,34 +389,43 @@ export class DatabaseStorage implements IStorage {
     // Get all borrowers for the user
     const userBorrowers = await this.getBorrowers(userId);
     
+    // Get all interest entries
+    const result = await db
+      .select()
+      .from(interestEntries)
+      .where(eq(interestEntries.userId, userId));
+    
     // Calculate total lent
     const totalLent = userLoans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0);
     
-    // Calculate outstanding principal (total lent minus principal payments)
-    const principalPaid = userPayments
-      .filter(p => p.paymentType === 'principal' || p.paymentType === 'mixed')
-      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
+    // Calculate total interest generated
+    const totalInterestGenerated = result.reduce((sum, entry) => sum + parseFloat(entry.interestAmount), 0);
+    
+    // Calculate payments allocation
+    let principalPaid = 0;
+    let interestPaid = 0;
+    
+    userPayments.forEach(payment => {
+      const amount = parseFloat(payment.amount);
+      // Always apply payment to interest first, then principal
+      const pendingInterestAtTime = totalInterestGenerated - interestPaid;
+      const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
+      const toPrincipal = amount - toInterest;
+      interestPaid += toInterest;
+      principalPaid += toPrincipal;
+    });
+    
     const outstandingPrincipal = totalLent - principalPaid;
+    const interestPending = totalInterestGenerated - interestPaid;
     
-    // Calculate interest received (interest payments)
-    const interestReceived = userPayments
-      .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-      .reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-    
-    // Calculate interest pending (would need interest calculation logic - simplified for now)
-    const interestPending = 0; // TODO: Implement interest calculation
-    
-    // Count active borrowers and loans
+    // Count active borrowers
     const activeBorrowers = userBorrowers.filter(b => b.status === 'active').length;
-    const activeLoans = userLoans.filter(l => l.status === 'active').length;
     
     return {
-      totalLent: totalLent.toFixed(2),
-      outstandingPrincipal: outstandingPrincipal.toFixed(2),
-      interestReceived: interestReceived.toFixed(2),
-      interestPending: interestPending.toFixed(2),
+      totalLent: `₹${totalLent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+      totalOutstanding: `₹${outstandingPrincipal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+      totalPendingInterest: `₹${interestPending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       activeBorrowers,
-      activeLoans,
     };
   }
 }

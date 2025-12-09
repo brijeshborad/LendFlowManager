@@ -13,7 +13,10 @@ interface BorrowerCardProps {
   avatar?: string;
   totalLent: string;
   outstanding: string;
+  interestEarned: string;
   pendingInterest: string;
+  totalPaid: string;
+  paymentCount: number;
   lastPayment?: {
     date: string;
     amount: string;
@@ -33,7 +36,10 @@ export function BorrowerCard({
   avatar,
   totalLent,
   outstanding,
+  interestEarned,
   pendingInterest,
+  totalPaid,
+  paymentCount,
   lastPayment,
   daysSincePayment,
   status,
@@ -102,28 +108,21 @@ export function BorrowerCard({
                 <p className="text-base font-semibold font-mono text-orange-600">{outstanding}</p>
               </div>
               <div>
+                <p className="text-xs text-muted-foreground">Interest Earned</p>
+                <p className="text-base font-semibold font-mono text-green-600">{interestEarned}</p>
+              </div>
+              <div>
                 <p className="text-xs text-muted-foreground">Pending Interest</p>
                 <p className="text-base font-semibold font-mono text-red-600">{pendingInterest}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Last Payment</p>
-                {lastPayment ? (
-                  <>
-                    <p className="text-base font-semibold font-mono">{lastPayment.amount}</p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">
-                        {daysSincePayment} days ago
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No payments yet</p>
-                )}
+                <p className="text-xs text-muted-foreground">Total Paid</p>
+                <p className="text-base font-semibold font-mono text-blue-600">{totalPaid}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{paymentCount} payment{paymentCount !== 1 ? 's' : ''}</p>
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               <Button 
                 size="sm" 
                 variant="outline" 
