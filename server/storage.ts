@@ -7,7 +7,6 @@ import {
   emailLogs,
   emailTemplates,
   auditLogs,
-  interestEntries,
   type User,
   type UpsertUser,
   type Borrower,
@@ -27,6 +26,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { calculateRealTimeInterestForUser } from "./interestCalculationService";
 
 // Interface for storage operations
 export interface IStorage {
@@ -389,17 +389,12 @@ export class DatabaseStorage implements IStorage {
     // Get all borrowers for the user
     const userBorrowers = await this.getBorrowers(userId);
     
-    // Get all interest entries
-    const result = await db
-      .select()
-      .from(interestEntries)
-      .where(eq(interestEntries.userId, userId));
+    // Get real-time interest data
+    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
+    const totalInterestGenerated = realTimeInterest.reduce((sum, entry) => sum + entry.totalInterest, 0);
     
     // Calculate total lent
     const totalLent = userLoans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0);
-    
-    // Calculate total interest generated
-    const totalInterestGenerated = result.reduce((sum, entry) => sum + parseFloat(entry.interestAmount), 0);
     
     // Calculate payments allocation
     let principalPaid = 0;

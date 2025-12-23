@@ -12,7 +12,6 @@ import Dashboard from "@/pages/Dashboard";
 import Landing from "@/pages/Landing";
 import Borrowers from "@/pages/Borrowers";
 import Loans from "@/pages/Loans";
-import InterestHistory from "@/pages/InterestHistory";
 import Reports from "@/pages/Reports";
 import Reminders from "@/pages/Reminders";
 import EmailTemplates from "@/pages/EmailTemplates";
@@ -42,7 +41,6 @@ function Router() {
           <Route path="/" component={Dashboard} />
           <Route path="/borrowers" component={Borrowers} />
           <Route path="/loans" component={Loans} />
-          <Route path="/interest-history" component={InterestHistory} />
           <Route path="/reports" component={Reports} />
           <Route path="/reminders" component={Reminders} />
           <Route path="/templates" component={EmailTemplates} />

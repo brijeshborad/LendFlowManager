@@ -29,11 +29,6 @@ const menuItems = [
     icon: Wallet,
   },
   {
-    title: "Interest History",
-    url: "/interest-history",
-    icon: TrendingUp,
-  },
-  {
     title: "Reports",
     url: "/reports",
     icon: FileText,

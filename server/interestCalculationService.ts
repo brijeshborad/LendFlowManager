@@ -35,91 +35,56 @@ function addMonthsSafe(date: Date, monthsToAdd: number): Date {
 }
 
 /**
- * Calculate monthly interest for a single loan
+ * Calculate real-time interest for a loan based on 30-day months
  */
-export function calculateMonthlyInterest(
+function calculateRealTimeInterest(
   principalAmount: number,
-  annualInterestRate: number,
-  interestRateType: 'monthly' | 'annual'
+  interestRate: number,
+  interestRateType: 'monthly' | 'annual',
+  startDate: Date,
+  endDate: Date = new Date()
 ): number {
+  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const monthsElapsed = daysDiff / 30; // Always use 30 days per month
+  
   if (interestRateType === 'monthly') {
-    // Monthly rate is already monthly
-    return principalAmount * (annualInterestRate / 100);
+    return principalAmount * (interestRate / 100) * monthsElapsed;
   } else {
-    // Annual rate needs to be divided by 12
-    return principalAmount * (annualInterestRate / 100 / 12);
+    // Annual rate divided by 12 for monthly, then multiplied by months elapsed
+    return principalAmount * (interestRate / 100 / 12) * monthsElapsed;
   }
 }
 
 /**
- * Get all active loans that need interest entries for a specific month
+ * Calculate total interest for all active loans in real-time
  */
-export async function getLoansNeedingInterestCalculation(
-  targetMonth: Date
-): Promise<InterestCalculation[]> {
+export async function calculateRealTimeInterestForUser(userId: string) {
   try {
     const activeLoans = await db
       .select()
       .from(loans)
-      .where(eq(loans.status, 'active'));
+      .where(and(eq(loans.userId, userId), eq(loans.status, 'active')));
 
-    const calculations: InterestCalculation[] = [];
-
-    for (const loan of activeLoans) {
-      const startDate = new Date(loan.startDate);
-      const currentDate = new Date();
-      
-      // Calculate which month period we should be calculating
-      const monthsSinceStart = 
-        (targetMonth.getFullYear() - startDate.getFullYear()) * 12 +
-        (targetMonth.getMonth() - startDate.getMonth());
-      
-      // Skip if this month is before the loan start date
-      if (monthsSinceStart < 0) continue;
-      
-      // Use safe month addition to avoid skipping months for 29th-31st dates
-      const periodStart = addMonthsSafe(startDate, monthsSinceStart);
-      const periodEnd = addMonthsSafe(startDate, monthsSinceStart + 1);
-      
-      // Check if we already have an entry for this period
-      const existingEntry = await db
-        .select()
-        .from(interestEntries)
-        .where(
-          and(
-            eq(interestEntries.loanId, loan.id),
-            eq(interestEntries.periodStart, periodStart)
-          )
-        )
-        .limit(1);
-
-      // Skip if entry already exists for this period
-      if (existingEntry.length > 0) continue;
-
+    const loanInterests = activeLoans.map(loan => {
       const principal = parseFloat(loan.principalAmount);
       const rate = parseFloat(loan.interestRate);
-      const interestAmount = calculateMonthlyInterest(
+      const totalInterest = calculateRealTimeInterest(
         principal,
         rate,
-        loan.interestRateType as 'monthly' | 'annual'
+        loan.interestRateType as 'monthly' | 'annual',
+        new Date(loan.startDate)
       );
-
-      calculations.push({
+      
+      return {
         loanId: loan.id,
         borrowerId: loan.borrowerId,
-        userId: loan.userId,
-        periodStart,
-        periodEnd,
-        principalAmount: loan.principalAmount,
-        interestRate: loan.interestRate,
-        interestRateType: loan.interestRateType,
-        interestAmount: interestAmount.toFixed(2),
-      });
-    }
+        totalInterest
+      };
+    });
 
-    return calculations;
+    return loanInterests;
   } catch (error) {
-    console.error('Error getting loans for interest calculation:', error);
+    console.error('Error calculating real-time interest:', error);
     throw error;
   }
 }

@@ -20,6 +20,7 @@ import {
     generateMonthlyInterestEntries,
     calculateOutstandingInterest,
     generateHistoricalInterestEntries,
+    calculateRealTimeInterestForUser,
 } from "./interestCalculationService";
 import {sendMonthlyInterestReminders, getSchedulerStatus} from "./reminderSchedulerService";
 
@@ -545,37 +546,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
-    // Interest Entry routes
-    app.get("/api/interest-entries", isAuthenticated, async (req: any, res: Response) => {
+    // Real-time interest calculation
+    app.get("/api/interest/real-time", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const entries = await getUserInterestEntries(userId);
-            res.json(entries);
+            const interests = await calculateRealTimeInterestForUser(userId);
+            res.json(interests);
         } catch (error: any) {
-            console.error("Error fetching interest entries:", error);
-            res.status(500).json({message: "Failed to fetch interest entries"});
+            console.error("Error calculating real-time interest:", error);
+            res.status(500).json({message: "Failed to calculate real-time interest"});
         }
     });
 
-    app.get("/api/interest-entries/loan/:loanId", isAuthenticated, async (req: any, res: Response) => {
-        try {
-            const entries = await getInterestHistory(req.params.loanId);
-            res.json(entries);
-        } catch (error: any) {
-            console.error("Error fetching interest history:", error);
-            res.status(500).json({message: "Failed to fetch interest history"});
-        }
-    });
-
-    app.get("/api/interest-entries/loan/:loanId/outstanding", isAuthenticated, async (req: any, res: Response) => {
-        try {
-            const outstanding = await calculateOutstandingInterest(req.params.loanId);
-            res.json({outstandingInterest: outstanding});
-        } catch (error: any) {
-            console.error("Error calculating outstanding interest:", error);
-            res.status(500).json({message: "Failed to calculate outstanding interest"});
-        }
-    });
+    // Interest Entry routes (deprecated - using real-time calculation)
+    // app.get("/api/interest-entries", ...)
 
     // Admin/Job routes for interest calculation and reminders
     app.post("/api/admin/generate-interest", isAuthenticated, async (req: any, res: Response) => {

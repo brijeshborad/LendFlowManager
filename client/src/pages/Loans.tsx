@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Calendar, TrendingUp, Wallet } from "lucide-react";
+import { Plus, Calendar, TrendingUp, Wallet, ArrowLeft, Eye } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,8 @@ import type { Loan, Borrower } from "@shared/schema";
 
 export default function Loans() {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [, setLocation] = useLocation();
+  const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
   const { data: loans = [], isLoading } = useQuery<Loan[]>({
     queryKey: ['/api/loans'],
@@ -18,11 +21,25 @@ export default function Loans() {
   const { data: borrowers = [] } = useQuery<Borrower[]>({
     queryKey: ['/api/borrowers'],
   });
-
-  const getBorrowerName = (borrowerId: string) => {
-    const borrower = borrowers.find(b => b.id === borrowerId);
-    return borrower?.name || 'Unknown';
-  };
+  
+  const { data: payments = [] } = useQuery({
+    queryKey: ['/api/payments'],
+  });
+  
+  const { data: realTimeInterest = [] } = useQuery({
+    queryKey: ['/api/interest/real-time'],
+  });
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (id) setSelectedLoanId(id);
+  }, []);
+  
+  const selectedLoan = loans.find(l => l.id === selectedLoanId);
+  const selectedBorrower = borrowers.find(b => b.id === selectedLoan?.borrowerId);
+  const loanPayments = payments.filter((p: any) => p.loanId === selectedLoanId);
+  const loanInterest = realTimeInterest.find((i: any) => i.loanId === selectedLoanId);
 
   const formatCurrency = (amount: string | number) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -37,6 +54,91 @@ export default function Loans() {
       year: 'numeric'
     });
   };
+
+  const getBorrowerName = (borrowerId: string) => {
+    const borrower = borrowers.find(b => b.id === borrowerId);
+    return borrower?.name || 'Unknown';
+  };
+
+  const handleViewLoan = (loanId: string) => {
+    setSelectedLoanId(loanId);
+    window.history.pushState({}, '', `/loans?id=${loanId}`);
+  };
+  
+  if (selectedLoan) {
+    const totalPaid = loanPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    const interestGenerated = loanInterest?.totalInterest || 0;
+    const interestPaid = loanPayments
+      .filter((p: any) => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    const pendingInterest = interestGenerated - interestPaid;
+    
+    return (
+      <div className="p-8 space-y-6">
+        <Button variant="ghost" onClick={() => setSelectedLoanId(null)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Loans
+        </Button>
+        
+        <div>
+          <h1 className="text-3xl font-semibold">{selectedBorrower?.name}</h1>
+          <p className="text-muted-foreground mt-1">Loan Details</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <h3 className="font-semibold">Principal Amount</h3>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{formatCurrency(selectedLoan.principalAmount)}</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <h3 className="font-semibold">Interest Rate</h3>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">{selectedLoan.interestRate}% {selectedLoan.interestRateType}</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <h3 className="font-semibold">Total Paid</h3>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold text-green-600">₹{totalPaid.toLocaleString('en-IN')}</p>
+            </CardContent>
+          </Card>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <h2 className="text-xl font-semibold">Payment History</h2>
+          </CardHeader>
+          <CardContent>
+            {loanPayments.length === 0 ? (
+              <p className="text-muted-foreground">No payments yet</p>
+            ) : (
+              <div className="space-y-2">
+                {loanPayments.map((payment: any) => (
+                  <div key={payment.id} className="flex justify-between items-center p-3 border rounded">
+                    <div>
+                      <p className="font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
+                      <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{new Date(payment.paymentDate).toLocaleDateString()}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 space-y-6">
@@ -80,7 +182,7 @@ export default function Loans() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {loans.map((loan) => (
-            <Card key={loan.id} className="hover-elevate" data-testid={`card-loan-${loan.id}`}>
+            <Card key={loan.id} className="hover-elevate cursor-pointer" onClick={() => handleViewLoan(loan.id)} data-testid={`card-loan-${loan.id}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>

@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
-import type { Borrower, Loan, Payment, InterestEntry } from "@shared/schema";
+import type { Borrower, Loan, Payment } from "@shared/schema";
 import avatar1 from '@assets/generated_images/Professional_male_avatar_headshot_3c69c06f.png';
 import avatar2 from '@assets/generated_images/Professional_female_avatar_headshot_d7c69081.png';
 import avatar3 from '@assets/generated_images/Professional_diverse_avatar_headshot_7572a5aa.png';
@@ -39,6 +39,11 @@ export default function Dashboard() {
     queryKey: ['/api/borrowers'],
   });
 
+  // Fetch real-time interest data
+  const { data: realTimeInterest = [] } = useQuery({
+    queryKey: ['/api/interest/real-time'],
+  });
+
   // Fetch all loans
   const { data: loans = [] } = useQuery<Loan[]>({
     queryKey: ['/api/loans'],
@@ -47,11 +52,6 @@ export default function Dashboard() {
   // Fetch all payments
   const { data: payments = [] } = useQuery<Payment[]>({
     queryKey: ['/api/payments'],
-  });
-
-  // Fetch interest entries
-  const { data: interestEntries = [] } = useQuery<InterestEntry[]>({
-    queryKey: ['/api/interest-entries'],
   });
 
   const [chartTimeRange, setChartTimeRange] = useState(6);
@@ -180,20 +180,15 @@ export default function Dashboard() {
       months[key] = 0;
     }
 
-    // Aggregate interest entries by month
-    interestEntries.forEach(entry => {
-      const entryDate = new Date(entry.periodEnd);
-      const monthKey = monthNames[entryDate.getMonth()];
-      if (months[monthKey] !== undefined) {
-        months[monthKey] += parseFloat(entry.interestAmount);
-      }
-    });
-
+    // Use real-time interest data
+    const totalInterest = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
+    const monthlyAvg = totalInterest / 6;
+    
     return Object.entries(months).map(([month, amount]) => ({
       month,
-      interest: Math.round(amount),
+      interest: Math.round(monthlyAvg),
     }));
-  }, [interestEntries]);
+  }, [realTimeInterest]);
 
   // Calculate additional metrics
   const additionalMetrics = useMemo(() => {
@@ -206,14 +201,14 @@ export default function Dashboard() {
       ? loans.reduce((sum, loan) => sum + parseFloat(loan.interestRate), 0) / totalLoans
       : 0;
     
-    const totalInterestEarned = interestEntries.reduce((sum, entry) => sum + parseFloat(entry.interestAmount), 0);
+    const totalInterestEarned = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
     
     return {
       avgLoanSize,
       avgInterestRate,
       totalInterestEarned,
     };
-  }, [loans, interestEntries]);
+  }, [loans, realTimeInterest]);
 
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
@@ -222,8 +217,13 @@ export default function Dashboard() {
   };
 
   const handleViewDetails = (borrowerId: string) => {
-    // Navigate to borrower details page
-    window.location.href = `/borrowers?id=${borrowerId}`;
+    // Find the first loan for this borrower and navigate to loan details
+    const borrowerLoan = loans.find(l => l.borrowerId === borrowerId);
+    if (borrowerLoan) {
+      window.location.href = `/loans?id=${borrowerLoan.id}`;
+    } else {
+      window.location.href = `/borrowers?id=${borrowerId}`;
+    }
   };
 
   const handleAddPayment = (borrowerId: string) => {
@@ -344,7 +344,7 @@ export default function Dashboard() {
               ₹{additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {interestEntries.length} interest entries
+              Real-time calculation
             </p>
           </CardContent>
         </Card>
@@ -491,10 +491,10 @@ export default function Dashboard() {
                         const borrowerPayments = payments.filter((p) => 
                           borrowerLoans.some((l) => l.id === p.loanId)
                         );
-                        const borrowerInterest = interestEntries.filter((i) => i.borrowerId === borrower.id);
+                        const borrowerInterestData = realTimeInterest.filter((i: any) => i.borrowerId === borrower.id);
                         
                         const totalLent = borrowerLoans.reduce((sum, loan) => sum + (parseFloat(loan.principalAmount) || 0), 0);
-                        const totalInterestGenerated = borrowerInterest.reduce((sum, entry) => sum + (parseFloat(entry.interestAmount) || 0), 0);
+                        const totalInterestGenerated = borrowerInterestData.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
                         
                         // Calculate payments allocation
                         let principalPaid = 0;
