@@ -211,14 +211,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Payment operations
-  async getPayments(userId: string, loanId?: string): Promise<Payment[]> {
+  async getPayments(userId: string, loanId?: string): Promise<any[]> {
     const conditions = [eq(payments.userId, userId)];
     if (loanId) {
       conditions.push(eq(payments.loanId, loanId));
     }
     return db
-      .select()
+      .select({
+        id: payments.id,
+        loanId: payments.loanId,
+        userId: payments.userId,
+        paymentDate: payments.paymentDate,
+        amount: payments.amount,
+        paymentType: payments.paymentType,
+        paymentMethod: payments.paymentMethod,
+        transactionReference: payments.transactionReference,
+        receiptUrl: payments.receiptUrl,
+        notes: payments.notes,
+        verified: payments.verified,
+        createdAt: payments.createdAt,
+        updatedAt: payments.updatedAt,
+        borrowerName: borrowers.name,
+      })
       .from(payments)
+      .innerJoin(loans, eq(payments.loanId, loans.id))
+      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
       .where(and(...conditions))
       .orderBy(desc(payments.paymentDate));
   }

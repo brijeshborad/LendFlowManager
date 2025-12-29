@@ -501,7 +501,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.patch("/api/payments/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const payment = await storage.updatePayment(req.params.id, userId, req.body);
+            // Convert paymentDate string to Date object if provided
+            const updateData = {
+                ...req.body,
+                ...(req.body.paymentDate && { paymentDate: new Date(req.body.paymentDate) })
+            };
+            const payment = await storage.updatePayment(req.params.id, userId, updateData);
 
             await storage.createAuditLog({
                 userId,
@@ -831,7 +836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const borrowers = await storage.getBorrowers(userId);
             const loans = await storage.getLoans(userId);
             const payments = await storage.getPayments(userId);
-            const interestEntries = await getUserInterestEntries(userId);
+            const realTimeInterest = await calculateRealTimeInterestForUser(userId);
 
             const report = borrowers.map(borrower => {
                 const borrowerLoans = loans.filter(l => l.borrowerId === borrower.id);
@@ -842,11 +847,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
                 borrowerLoans.forEach(loan => {
                     const loanPayments = payments.filter(p => p.loanId === loan.id);
-
-                    console.log('loanPayments >>>>>>>>>>>>>>>', loanPayments);
-                    const loanInterest = interestEntries.filter((i: any) => i.loanId === loan.id);
+                    const loanInterest = realTimeInterest.find(i => i.loanId === loan.id);
+                    
                     totalPaid += loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
-                    totalInterest += loanInterest.reduce((sum: number, i: any) => sum + parseFloat(i.interestAmount.toString()), 0);
+                    totalInterest += loanInterest?.totalInterest || 0;
                 });
 
                 const balance = totalPrincipal + totalInterest - totalPaid;

@@ -1,20 +1,43 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Plus, Calendar, TrendingUp, Wallet, ArrowLeft, Eye, Edit } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Plus, Calendar, TrendingUp, Wallet, ArrowLeft, Eye, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { AddLoanModal } from "@/components/AddLoanModal";
 import { EditLoanModal } from "@/components/EditLoanModal";
 import { AddPaymentModal } from "@/components/AddPaymentModal";
+import { EditPaymentModal } from "@/components/EditPaymentModal";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {Loan, Borrower, Payment} from "@shared/schema";
 
 export default function Loans() {
+  const { toast } = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
+  const [editPaymentModalOpen, setEditPaymentModalOpen] = useState(false);
+  const [deletePaymentDialogOpen, setDeletePaymentDialogOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [, setLocation] = useLocation();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
@@ -33,6 +56,46 @@ export default function Loans() {
   const { data: realTimeInterest = [] } = useQuery<[]>({
     queryKey: ['/api/interest/real-time'],
   });
+  
+  const deletePaymentMutation = useMutation({
+    mutationFn: async (paymentId: string) => {
+      await apiRequest("DELETE", `/api/payments/${paymentId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Payment deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      setDeletePaymentDialogOpen(false);
+      setSelectedPayment(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete payment",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditPayment = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setEditPaymentModalOpen(true);
+  };
+
+  const handleDeletePayment = (payment: Payment) => {
+    setSelectedPayment(payment);
+    setDeletePaymentDialogOpen(true);
+  };
+
+  const confirmDeletePayment = () => {
+    if (selectedPayment) {
+      deletePaymentMutation.mutate(selectedPayment.id);
+    }
+  };
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -164,7 +227,29 @@ export default function Loans() {
                       <p className="font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
                       <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{new Date(payment.paymentDate).toLocaleDateString()}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm text-muted-foreground">{new Date(payment.paymentDate).toLocaleDateString()}</p>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeletePayment(payment)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -183,6 +268,30 @@ export default function Loans() {
           preSelectedBorrowerId={selectedLoan.borrowerId}
           loanId={selectedLoan.id}
         />
+        <EditPaymentModal 
+          open={editPaymentModalOpen} 
+          onClose={() => setEditPaymentModalOpen(false)} 
+          payment={selectedPayment}
+        />
+        <AlertDialog open={deletePaymentDialogOpen} onOpenChange={setDeletePaymentDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Payment</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete this payment of ₹{selectedPayment?.amount}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={confirmDeletePayment}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
