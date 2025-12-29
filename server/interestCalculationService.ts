@@ -78,7 +78,8 @@ export async function calculateRealTimeInterestForUser(userId: string) {
       return {
         loanId: loan.id,
         borrowerId: loan.borrowerId,
-        totalInterest
+        totalInterest,
+        startDate: loan.startDate
       };
     });
 

@@ -397,7 +397,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.patch("/api/loans/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const loan = await storage.updateLoan(req.params.id, userId, req.body);
+            // Convert startDate string to Date object if provided
+            const updateData = {
+                ...req.body,
+                ...(req.body.startDate && { startDate: new Date(req.body.startDate) })
+            };
+            const loan = await storage.updateLoan(req.params.id, userId, updateData);
 
             await storage.createAuditLog({
                 userId,

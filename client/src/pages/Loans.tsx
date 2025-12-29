@@ -1,16 +1,20 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Plus, Calendar, TrendingUp, Wallet, ArrowLeft, Eye } from "lucide-react";
+import { Plus, Calendar, TrendingUp, Wallet, ArrowLeft, Eye, Edit } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AddLoanModal } from "@/components/AddLoanModal";
-import type { Loan, Borrower } from "@shared/schema";
+import { EditLoanModal } from "@/components/EditLoanModal";
+import { AddPaymentModal } from "@/components/AddPaymentModal";
+import {Loan, Borrower, Payment} from "@shared/schema";
 
 export default function Loans() {
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [, setLocation] = useLocation();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
@@ -22,11 +26,11 @@ export default function Loans() {
     queryKey: ['/api/borrowers'],
   });
   
-  const { data: payments = [] } = useQuery({
+  const { data: payments = [] } = useQuery<Payment[]>({
     queryKey: ['/api/payments'],
   });
   
-  const { data: realTimeInterest = [] } = useQuery({
+  const { data: realTimeInterest = [] } = useQuery<[]>({
     queryKey: ['/api/interest/real-time'],
   });
   
@@ -80,9 +84,27 @@ export default function Loans() {
           Back to Loans
         </Button>
         
-        <div>
-          <h1 className="text-3xl font-semibold">{selectedBorrower?.name}</h1>
-          <p className="text-muted-foreground mt-1">Loan Details</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold">{selectedBorrower?.name}</h1>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-muted-foreground">Loan Details</p>
+              <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span>Started: {formatDate(selectedLoan.startDate)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setAddPaymentModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Payment
+            </Button>
+            <Button onClick={() => setEditModalOpen(true)} variant="outline">
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Loan
+            </Button>
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -106,10 +128,23 @@ export default function Loans() {
           
           <Card>
             <CardHeader>
-              <h3 className="font-semibold">Total Paid</h3>
+              <h3 className="font-semibold">Payment Summary</h3>
             </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600">₹{totalPaid.toLocaleString('en-IN')}</p>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Interest Earned:</span>
+                <span className="font-semibold text-blue-600">₹{interestGenerated.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Total Paid:</span>
+                <span className="font-semibold text-green-600">₹{totalPaid.toLocaleString('en-IN')}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-sm text-muted-foreground">Pending Interest:</span>
+                <span className="font-semibold text-orange-600">₹{pendingInterest.toLocaleString('en-IN')}</span>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -136,6 +171,18 @@ export default function Loans() {
             )}
           </CardContent>
         </Card>
+        
+        <EditLoanModal 
+          open={editModalOpen} 
+          onClose={() => setEditModalOpen(false)} 
+          loan={selectedLoan || null}
+        />
+        <AddPaymentModal 
+          open={addPaymentModalOpen} 
+          onClose={() => setAddPaymentModalOpen(false)} 
+          preSelectedBorrowerId={selectedLoan.borrowerId}
+          loanId={selectedLoan.id}
+        />
       </div>
     );
   }

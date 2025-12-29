@@ -28,18 +28,20 @@ interface AddPaymentModalProps {
   open: boolean;
   onClose: () => void;
   preSelectedBorrowerId?: string | null;
+  loanId?: string;
 }
 
 export function AddPaymentModal({
   open,
   onClose,
   preSelectedBorrowerId,
+  loanId: preSelectedLoanId,
 }: AddPaymentModalProps) {
   const { toast } = useToast();
   const [borrowerId, setBorrowerId] = useState("");
   const [loanId, setLoanId] = useState("");
   const [paymentType, setPaymentType] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
 
   // Fetch borrowers
   const { data: borrowers = [] } = useQuery<Borrower[]>({
@@ -55,20 +57,29 @@ export function AddPaymentModal({
 
   const borrowerLoans = allLoans.filter(loan => loan.borrowerId === borrowerId);
 
-  // Set pre-selected borrower when modal opens
+  // Set pre-selected borrower and loan when modal opens
   useEffect(() => {
-    if (open && preSelectedBorrowerId) {
+    if (open && preSelectedLoanId) {
+      const loan = allLoans.find(l => l.id === preSelectedLoanId);
+      if (loan) {
+        setBorrowerId(loan.borrowerId);
+        setLoanId(preSelectedLoanId);
+      }
+    } else if (open && preSelectedBorrowerId) {
       setBorrowerId(preSelectedBorrowerId);
-    } else if (open && !preSelectedBorrowerId) {
+      setLoanId("");
+    } else if (open) {
       setBorrowerId("");
       setLoanId("");
     }
-  }, [open, preSelectedBorrowerId]);
+  }, [open, preSelectedBorrowerId, preSelectedLoanId, allLoans]);
 
-  // Reset loan when borrower changes
+  // Reset loan when borrower changes (only if no pre-selected loan)
   useEffect(() => {
-    setLoanId("");
-  }, [borrowerId]);
+    if (!preSelectedLoanId) {
+      setLoanId("");
+    }
+  }, [borrowerId, preSelectedLoanId]);
 
   const addPaymentMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -159,7 +170,7 @@ export function AddPaymentModal({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="loan">Loan</Label>
-                <Select value={loanId} onValueChange={setLoanId} required disabled={!borrowerId}>
+                <Select value={loanId} onValueChange={setLoanId} required>
                   <SelectTrigger id="loan" data-testid="select-loan">
                     <SelectValue placeholder="Select loan" />
                   </SelectTrigger>
