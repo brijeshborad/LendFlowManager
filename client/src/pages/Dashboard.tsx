@@ -170,25 +170,57 @@ export default function Dashboard() {
   // Calculate monthly interest earned for area chart
   const monthlyInterestData = useMemo(() => {
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const months: { [key: string]: number } = {};
+    const months: { [key: string]: { earned: number; collected: number; pending: number } } = {};
     
     // Initialize last 6 months
     const today = new Date();
     for (let i = 5; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
       const key = `${monthNames[date.getMonth()]}`;
-      months[key] = 0;
+      months[key] = { earned: 0, collected: 0, pending: 0 };
     }
 
-    // Use real-time interest data
-    const totalInterest = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
-    const monthlyAvg = totalInterest / 6;
+    // Calculate interest earned for each loan by month
+    loans.forEach(loan => {
+      const startDate = new Date(loan.startDate);
+      const interestRate = parseFloat(loan.interestRate) / 100;
+      const principal = parseFloat(loan.principalAmount);
+      
+      Object.keys(months).forEach(monthKey => {
+        const monthIndex = monthNames.indexOf(monthKey);
+        const monthDate = new Date(today.getFullYear(), monthIndex, 1);
+        
+        if (monthDate >= startDate && loan.status === 'active') {
+          const monthlyInterest = principal * interestRate;
+          months[monthKey].earned += monthlyInterest;
+        }
+      });
+    });
+
+    // Calculate interest payments collected by month
+    payments
+      .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+      .forEach(payment => {
+        const paymentDate = new Date(payment.paymentDate);
+        const monthKey = monthNames[paymentDate.getMonth()];
+        if (months[monthKey]) {
+          months[monthKey].collected += parseFloat(payment.amount);
+        }
+      });
+
+    // Calculate pending interest (cumulative)
+    let cumulativePending = 0;
     
-    return Object.entries(months).map(([month, amount]) => ({
-      month,
-      interest: Math.round(monthlyAvg),
-    }));
-  }, [realTimeInterest]);
+    return Object.entries(months).map(([month, data]) => {
+      cumulativePending += data.earned - data.collected;
+      return {
+        month,
+        earned: Math.round(data.earned),
+        collected: Math.round(data.collected),
+        pending: Math.round(Math.max(0, cumulativePending)),
+      };
+    });
+  }, [loans, payments]);
 
   // Calculate additional metrics
   const additionalMetrics = useMemo(() => {
@@ -265,13 +297,13 @@ export default function Dashboard() {
       </div>
 
       {statsLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+          {[1, 2, 3, 4, 5].map((i) => (
             <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
           <SummaryCard
             title="Total Amount Lent"
             value={formatCurrency(stats?.totalLent || 0) || "₹0"}
@@ -288,10 +320,20 @@ export default function Dashboard() {
             data-testid="card-outstanding"
           />
           <SummaryCard
+            title="Total Paid Interest"
+            value={formatCurrency(payments
+              .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+              .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
+            subValue="Collected"
+            icon={TrendingUp}
+            iconColor="bg-emerald-500"
+            data-testid="card-paid-interest"
+          />
+          <SummaryCard
             title="Pending Interest"
             value={stats?.totalPendingInterest || "₹0"}
             icon={TrendingUp}
-            iconColor="bg-green-500"
+            iconColor="bg-red-500"
             data-testid="card-pending-interest"
           />
           <SummaryCard
@@ -425,12 +467,12 @@ export default function Dashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <TrendingUp className="h-5 w-5" />
-                  Monthly Interest Earned
+                  Monthly Interest Analysis
                 </CardTitle>
-                <CardDescription>Interest accumulated over the last 6 months</CardDescription>
+                <CardDescription>Interest earned vs collected vs pending over the last 6 months</CardDescription>
               </CardHeader>
               <CardContent>
-                {monthlyInterestData.every(d => d.interest === 0) ? (
+                {monthlyInterestData.every(d => d.earned === 0) ? (
                   <div className="h-64 flex items-center justify-center text-muted-foreground">
                     No interest data available
                   </div>
@@ -438,23 +480,52 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height={300}>
                     <AreaChart data={monthlyInterestData}>
                       <defs>
-                        <linearGradient id="colorInterest" x1="0" y1="0" x2="0" y2="1">
+                        <linearGradient id="colorEarned" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
                           <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                        </linearGradient>
+                        <linearGradient id="colorPending" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="month" />
                       <YAxis />
                       <Tooltip 
-                        formatter={(value: number) => [`₹${value.toLocaleString()}`, 'Interest']}
+                        formatter={(value: number, name: string) => {
+                          const label = name === 'earned' ? 'Interest Earned' : 
+                                       name === 'collected' ? 'Interest Collected' : 'Pending Interest';
+                          return [`₹${value.toLocaleString()}`, label];
+                        }}
                       />
                       <Area 
                         type="monotone" 
-                        dataKey="interest" 
+                        dataKey="earned" 
+                        stackId="1"
                         stroke="#10B981" 
                         fillOpacity={1} 
-                        fill="url(#colorInterest)" 
+                        fill="url(#colorEarned)" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="collected" 
+                        stackId="2"
+                        stroke="#3B82F6" 
+                        fillOpacity={1} 
+                        fill="url(#colorCollected)" 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="pending" 
+                        stackId="3"
+                        stroke="#EF4444" 
+                        fillOpacity={1} 
+                        fill="url(#colorPending)" 
                       />
                     </AreaChart>
                   </ResponsiveContainer>
