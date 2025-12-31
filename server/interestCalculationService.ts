@@ -44,14 +44,33 @@ function calculateRealTimeInterest(
   startDate: Date,
   endDate: Date = new Date()
 ): number {
-  const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  const monthsElapsed = daysDiff / 30; // Always use 30 days per month
+  // Calculate days treating all months as exactly 30 days
+  let adjustedDays = 0;
+  let currentDate = new Date(startDate);
+  
+  while (currentDate < endDate) {
+    const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const monthEnd = endOfMonth < endDate ? endOfMonth : endDate;
+    const daysToCount = Math.ceil((monthEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Always count exactly 30 days per month (treat all months as 30 days)
+    adjustedDays += Math.min(daysToCount, 30);
+    
+    // If we've completed a full month, always add 30 days regardless of actual month length
+    if (monthEnd === endOfMonth && currentDate.getDate() === 1) {
+      adjustedDays = adjustedDays - daysToCount + 30;
+    }
+    
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    currentDate.setDate(1);
+  }
+  
+  const exactMonths = adjustedDays / 30;
   
   if (interestRateType === 'monthly') {
-    return principalAmount * (interestRate / 100) * monthsElapsed;
+    return principalAmount * (interestRate / 100) * exactMonths;
   } else {
-    // Annual rate divided by 12 for monthly, then multiplied by months elapsed
-    return principalAmount * (interestRate / 100 / 12) * monthsElapsed;
+    return principalAmount * (interestRate / 100 / 12) * exactMonths;
   }
 }
 
@@ -65,6 +84,9 @@ export async function calculateRealTimeInterestForUser(userId: string) {
       .from(loans)
       .where(and(eq(loans.userId, userId), eq(loans.status, 'active')));
 
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Set to start of today
+
     const loanInterests = activeLoans.map(loan => {
       const principal = parseFloat(loan.principalAmount);
       const rate = parseFloat(loan.interestRate);
@@ -72,7 +94,8 @@ export async function calculateRealTimeInterestForUser(userId: string) {
         principal,
         rate,
         loan.interestRateType as 'monthly' | 'annual',
-        new Date(loan.startDate)
+        new Date(loan.startDate),
+        today // Use today instead of default
       );
       
       return {

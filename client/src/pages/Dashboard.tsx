@@ -65,30 +65,46 @@ export default function Dashboard() {
     const today = new Date();
     for (let i = chartTimeRange - 1; i >= 0; i--) {
       const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${monthNames[date.getMonth()]}`;
+      const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
       months[key] = { received: 0, pending: 0 };
     }
 
-    // Aggregate payments by month
+    // Aggregate payments by month and year
     payments.forEach(payment => {
       const paymentDate = new Date(payment.paymentDate);
-      const monthKey = monthNames[paymentDate.getMonth()];
+      const monthKey = `${monthNames[paymentDate.getMonth()]} ${paymentDate.getFullYear()}`;
       if (months[monthKey]) {
         months[monthKey].received += parseFloat(payment.amount);
       }
     });
 
-    // Calculate pending interest (simplified - from outstanding principal)
-    const totalOutstandingStr = stats?.totalOutstanding?.replace(/[^0-9.-]/g, '') || '0';
-    const totalOutstanding = parseFloat(totalOutstandingStr) || 0;
-    const monthlyPending = totalOutstanding * 0.01; // Approximate 1% monthly
+    // Calculate actual pending interest for each month (using 30-day month standard)
+    Object.keys(months).forEach(monthKey => {
+      const [monthName, year] = monthKey.split(' ');
+      const monthIndex = monthNames.indexOf(monthName);
+      const monthDate = new Date(parseInt(year), monthIndex, 1);
+      
+      // Calculate pending interest for active loans in that month
+      const pendingForMonth = loans
+        .filter(loan => {
+          const loanStart = new Date(loan.startDate);
+          return loanStart <= monthDate && loan.status === 'active';
+        })
+        .reduce((sum, loan) => {
+          const principal = parseFloat(loan.principalAmount);
+          const monthlyRate = parseFloat(loan.interestRate) / 100;
+          return sum + (principal * monthlyRate); // Standard monthly calculation
+        }, 0);
+      
+      months[monthKey].pending = Math.round(pendingForMonth);
+    });
     
     return Object.entries(months).map(([month, data]) => ({
-      month,
+      month: month.split(' ')[0], // Show only month name
       received: Math.round(data.received),
-      pending: Math.round(monthlyPending),
+      pending: data.pending,
     }));
-  }, [payments, stats, chartTimeRange]);
+  }, [payments, loans, chartTimeRange]);
 
   // Generate dynamic activity feed from recent payments and loans
   const activities = useMemo(() => {
@@ -180,7 +196,7 @@ export default function Dashboard() {
       months[key] = { earned: 0, collected: 0, pending: 0 };
     }
 
-    // Calculate interest earned for each loan by month
+    // Calculate interest earned for each loan by month (using 30-day month standard)
     loans.forEach(loan => {
       const startDate = new Date(loan.startDate);
       const interestRate = parseFloat(loan.interestRate) / 100;
@@ -191,7 +207,7 @@ export default function Dashboard() {
         const monthDate = new Date(today.getFullYear(), monthIndex, 1);
         
         if (monthDate >= startDate && loan.status === 'active') {
-          const monthlyInterest = principal * interestRate;
+          const monthlyInterest = principal * interestRate; // Standard monthly calculation
           months[monthKey].earned += monthlyInterest;
         }
       });
@@ -222,7 +238,7 @@ export default function Dashboard() {
     });
   }, [loans, payments]);
 
-  // Calculate additional metrics
+  // Calculate additional metrics including daily and monthly interest
   const additionalMetrics = useMemo(() => {
     const totalLoans = loans.length;
     const avgLoanSize = totalLoans > 0 
@@ -235,10 +251,31 @@ export default function Dashboard() {
     
     const totalInterestEarned = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
     
+    // Calculate daily interest earning (using 30-day month standard)
+    const dailyInterest = loans
+      .filter(loan => loan.status === 'active')
+      .reduce((sum, loan) => {
+        const principal = parseFloat(loan.principalAmount);
+        const monthlyRate = parseFloat(loan.interestRate) / 100;
+        const dailyRate = monthlyRate / 30; // Standard 30-day month
+        return sum + (principal * dailyRate);
+      }, 0);
+    
+    // Calculate monthly interest earning (using 30-day month standard)
+    const monthlyInterest = loans
+      .filter(loan => loan.status === 'active')
+      .reduce((sum, loan) => {
+        const principal = parseFloat(loan.principalAmount);
+        const monthlyRate = parseFloat(loan.interestRate) / 100;
+        return sum + (principal * monthlyRate);
+      }, 0);
+    
     return {
       avgLoanSize,
       avgInterestRate,
       totalInterestEarned,
+      dailyInterest,
+      monthlyInterest,
     };
   }, [loans, realTimeInterest]);
 
@@ -297,58 +334,85 @@ export default function Dashboard() {
       </div>
 
       {statsLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[6, 7].map((i) => (
+              <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
+            ))}
+          </div>
+        </>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-          <SummaryCard
-            title="Total Amount Lent"
-            value={formatCurrency(stats?.totalLent || 0) || "₹0"}
-            subValue="All time"
-            icon={LucideIndianRupee}
-            iconColor="bg-blue-500"
-            data-testid="card-total-lent"
-          />
-          <SummaryCard
-            title="Outstanding Principal"
-            value={stats?.totalOutstanding || "₹0"}
-            icon={Banknote}
-            iconColor="bg-orange-500"
-            data-testid="card-outstanding"
-          />
-          <SummaryCard
-            title="Total Paid Interest"
-            value={formatCurrency(payments
-              .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-              .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
-            subValue="Collected"
-            icon={TrendingUp}
-            iconColor="bg-emerald-500"
-            data-testid="card-paid-interest"
-          />
-          <SummaryCard
-            title="Pending Interest"
-            value={stats?.totalPendingInterest || "₹0"}
-            icon={TrendingUp}
-            iconColor="bg-red-500"
-            data-testid="card-pending-interest"
-          />
-          <SummaryCard
-            title="Active Borrowers"
-            value={String(stats?.activeBorrowers || 0)}
-            subValue={`${borrowers.length} total`}
-            icon={Users}
-            iconColor="bg-purple-500"
-            data-testid="card-active-borrowers"
-          />
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
+            <SummaryCard
+              title="Total Amount Lent"
+              value={formatCurrency(stats?.totalLent || 0) || "₹0"}
+              subValue="All time"
+              icon={LucideIndianRupee}
+              iconColor="bg-blue-500"
+              data-testid="card-total-lent"
+            />
+            <SummaryCard
+              title="Outstanding Principal"
+              value={stats?.totalOutstanding || "₹0"}
+              icon={Banknote}
+              iconColor="bg-orange-500"
+              data-testid="card-outstanding"
+            />
+            <SummaryCard
+              title="Total Paid Interest"
+              value={formatCurrency(payments
+                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
+              subValue="Collected"
+              icon={TrendingUp}
+              iconColor="bg-emerald-500"
+              data-testid="card-paid-interest"
+            />
+            <SummaryCard
+              title="Pending Interest"
+              value={stats?.totalPendingInterest || "₹0"}
+              icon={TrendingUp}
+              iconColor="bg-red-500"
+              data-testid="card-pending-interest"
+            />
+            <SummaryCard
+              title="Active Borrowers"
+              value={String(stats?.activeBorrowers || 0)}
+              subValue={`${borrowers.length} total`}
+              icon={Users}
+              iconColor="bg-purple-500"
+              data-testid="card-active-borrowers"
+            />
+          </div>
+        </>
       )}
 
       {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+
+          <SummaryCard
+              title="Daily Interest Earning"
+              value={formatCurrency(additionalMetrics.dailyInterest)}
+              subValue="Per day"
+              icon={TrendingUp}
+              iconColor="bg-green-500"
+              data-testid="card-daily-interest"
+          />
+          <SummaryCard
+              title="Monthly Interest Earning"
+              value={formatCurrency(additionalMetrics.monthlyInterest)}
+              subValue="Per month"
+              icon={TrendingUp}
+              iconColor="bg-teal-500"
+              data-testid="card-monthly-interest"
+          />
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Average Loan Size</CardTitle>
