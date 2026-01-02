@@ -47,8 +47,8 @@ export default function PendingInterestCalculator() {
     setLoading(true);
     try {
       const response = await apiRequest("GET", `/api/reports/pending-interest?borrowerId=${selectedBorrowerId}&tillDate=${tillDate}`);
-      console.log(response);
-      setResult(response);
+      const data = await response.json();
+      setResult(data);
     } catch (error) {
       console.error("Error calculating pending interest:", error);
       setResult(null);
@@ -134,7 +134,7 @@ export default function PendingInterestCalculator() {
               <div className="text-center">
                 <p className="text-sm text-muted-foreground">Total Pending Interest</p>
                 <p className="text-3xl font-bold text-red-600">
-                  {result.totalPendingInterest}
+                  {formatCurrency(result.totalPendingInterest)}
                 </p>
               </div>
             </div>

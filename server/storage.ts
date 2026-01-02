@@ -573,16 +573,41 @@ export class DatabaseStorage implements IStorage {
       const loan = loanRow.loans;
       const loanPayments = borrowerPayments.filter(p => p.payments.loanId === loan.id);
       
-      // Calculate interest from loan start to tillDate
+      // Use same 30-day calculation logic as calculateRealTimeInterest
       const startDate = new Date(loan.startDate);
       const endDate = tillDate > startDate ? tillDate : startDate;
-      const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
-      const daysDiff = endDate.getDate() - startDate.getDate();
-      const totalMonths = monthsDiff + (daysDiff > 0 ? daysDiff / 30 : 0);
       
+      // Calculate days treating all months as exactly 30 days
+      let adjustedDays = 0;
+      let currentDate = new Date(startDate);
+      
+      while (currentDate < endDate) {
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const monthEnd = endOfMonth < endDate ? endOfMonth : endDate;
+        const daysToCount = Math.ceil((monthEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        // Always count exactly 30 days per month (treat all months as 30 days)
+        adjustedDays += Math.min(daysToCount, 30);
+        
+        // If we've completed a full month, always add 30 days regardless of actual month length
+        if (monthEnd === endOfMonth && currentDate.getDate() === 1) {
+          adjustedDays = adjustedDays - daysToCount + 30;
+        }
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
+      }
+      
+      const exactMonths = adjustedDays / 30;
       const principal = parseFloat(loan.principalAmount.toString());
-      const monthlyRate = parseFloat(loan.interestRate.toString()) / 100;
-      const totalInterestTillDate = principal * monthlyRate * totalMonths;
+      const interestRate = parseFloat(loan.interestRate.toString());
+      
+      let totalInterestTillDate;
+      if (loan.interestRateType === 'monthly') {
+        totalInterestTillDate = principal * (interestRate / 100) * exactMonths;
+      } else {
+        totalInterestTillDate = principal * (interestRate / 100 / 12) * exactMonths;
+      }
       
       // Calculate interest payments till date
       const interestPaidTillDate = loanPayments
@@ -595,7 +620,7 @@ export class DatabaseStorage implements IStorage {
       loanDetails.push({
         loanId: loan.id,
         principalAmount: principal,
-        interestRate: parseFloat(loan.interestRate.toString()),
+        interestRate: interestRate,
         startDate: loan.startDate,
         totalInterestTillDate: parseFloat(totalInterestTillDate.toFixed(2)),
         interestPaidTillDate: parseFloat(interestPaidTillDate.toFixed(2)),
