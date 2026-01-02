@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ADD COLUMN "interest_cleared_till_date" timestamp;

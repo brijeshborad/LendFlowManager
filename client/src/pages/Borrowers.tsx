@@ -113,11 +113,15 @@ export default function Borrowers() {
 
   const formatDate = (date: Date | string) => {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    return dateObj.toLocaleDateString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric'
-    });
+    const day = dateObj.getDate();
+    const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+    const year = dateObj.getFullYear();
+    
+    const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                   day === 2 || day === 22 ? 'nd' :
+                   day === 3 || day === 23 ? 'rd' : 'th';
+    
+    return `${day}${suffix} ${month}, ${year}`;
   };
 
   // Calculate total interest summary for all borrower's loans
@@ -249,6 +253,11 @@ export default function Borrowers() {
                           {payment.paymentType} • {payment.paymentMethod}
                           {loan && ` • Loan: ${formatCurrency(loan.principalAmount)}`}
                         </p>
+                        {payment.interestClearedTillDate && (
+                          <p className="text-xs text-purple-600 mt-1">
+                            Interest cleared till: {formatDate(payment.interestClearedTillDate)}
+                          </p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted-foreground">{formatDate(payment.paymentDate)}</p>

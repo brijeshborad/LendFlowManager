@@ -22,6 +22,7 @@ interface BorrowerCardProps {
     amount: string;
   };
   daysSincePayment: number;
+  interestClearedTillDate?: string;
   status: "active" | "overdue" | "settled";
   onViewDetails?: (borrowerId: string) => void;
   onAddPayment?: (borrowerId: string) => void;
@@ -42,6 +43,7 @@ export function BorrowerCard({
   paymentCount,
   lastPayment,
   daysSincePayment,
+  interestClearedTillDate,
   status,
   onViewDetails,
   onAddPayment,
@@ -120,6 +122,12 @@ export function BorrowerCard({
                 <p className="text-base font-semibold font-mono text-blue-600">{totalPaid}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{paymentCount} payment{paymentCount !== 1 ? 's' : ''}</p>
               </div>
+              {interestClearedTillDate && (
+                <div>
+                  <p className="text-xs text-muted-foreground">Interest Cleared Till</p>
+                  <p className="text-base font-semibold font-mono text-purple-600">{interestClearedTillDate}</p>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 flex-wrap">

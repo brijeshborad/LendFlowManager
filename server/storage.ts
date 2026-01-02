@@ -225,6 +225,7 @@ export class DatabaseStorage implements IStorage {
         amount: payments.amount,
         paymentType: payments.paymentType,
         paymentMethod: payments.paymentMethod,
+        interestClearedTillDate: payments.interestClearedTillDate,
         transactionReference: payments.transactionReference,
         receiptUrl: payments.receiptUrl,
         notes: payments.notes,

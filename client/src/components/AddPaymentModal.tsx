@@ -137,6 +137,7 @@ export function AddPaymentModal({
       paymentMethod,
       transactionReference: formData.get("reference")?.toString() || null,
       notes: formData.get("notes")?.toString() || null,
+      interestClearedTillDate: formData.get("interest-cleared-till")?.toString() || null,
     });
   };
 
@@ -250,6 +251,22 @@ export function AddPaymentModal({
                 data-testid="input-reference"
               />
             </div>
+
+            {(paymentType === 'interest' || paymentType === 'partial-interest') && (
+              <div className="space-y-2">
+                <Label htmlFor="interest-cleared-till">Interest Cleared Till Date *</Label>
+                <Input
+                  id="interest-cleared-till"
+                  name="interest-cleared-till"
+                  type="date"
+                  required
+                  data-testid="input-interest-cleared-till"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Specify till which date the interest is cleared with this payment
+                </p>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>

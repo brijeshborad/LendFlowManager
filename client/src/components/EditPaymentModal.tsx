@@ -37,6 +37,7 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
   const [paymentMethod, setPaymentMethod] = useState("");
   const [transactionReference, setTransactionReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [interestClearedTillDate, setInterestClearedTillDate] = useState("");
 
   useEffect(() => {
     if (payment && open) {
@@ -46,6 +47,11 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
       setPaymentMethod(payment.paymentMethod);
       setTransactionReference(payment.transactionReference || "");
       setNotes(payment.notes || "");
+      setInterestClearedTillDate(
+        (payment as any).interestClearedTillDate 
+          ? new Date((payment as any).interestClearedTillDate).toISOString().split('T')[0]
+          : ""
+      );
     }
   }, [payment, open]);
 
@@ -84,6 +90,7 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
       paymentMethod,
       transactionReference: transactionReference || null,
       notes: notes || null,
+      interestClearedTillDate: interestClearedTillDate || null,
     });
   };
 
@@ -176,6 +183,20 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
                 disabled={updatePaymentMutation.isPending}
               />
             </div>
+
+            {(paymentType === 'interest' || paymentType === 'partial_interest') && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-interest-cleared-till">Interest Cleared Till Date *</Label>
+                <Input
+                  id="edit-interest-cleared-till"
+                  type="date"
+                  required
+                  value={interestClearedTillDate}
+                  onChange={(e) => setInterestClearedTillDate(e.target.value)}
+                  disabled={updatePaymentMutation.isPending}
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="edit-notes">Notes</Label>

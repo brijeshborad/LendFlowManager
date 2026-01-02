@@ -136,6 +136,7 @@ export const payments = pgTable("payments", {
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   paymentType: text("payment_type").notNull(), // "principal", "interest", "partial_interest", "mixed"
   paymentMethod: text("payment_method").notNull(), // "cash", "upi", "bank_transfer", "cheque"
+  interestClearedTillDate: timestamp("interest_cleared_till_date"),
   transactionReference: text("transaction_reference"),
   receiptUrl: text("receipt_url"),
   notes: text("notes"),

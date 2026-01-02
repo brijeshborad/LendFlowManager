@@ -203,6 +203,7 @@ export default function Reports() {
                         <TableHead>Borrower</TableHead>
                         <TableHead>Principal</TableHead>
                         <TableHead>Interest Rate</TableHead>
+                        <TableHead>Start Date</TableHead>
                         <TableHead>Interest Earned</TableHead>
                         <TableHead>Paid</TableHead>
                         <TableHead>Balance</TableHead>
@@ -210,7 +211,6 @@ export default function Reports() {
                         <TableHead>Daily Interest</TableHead>
                         <TableHead>Interest Cleared Till</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Due Date</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -219,14 +219,37 @@ export default function Reports() {
                           <TableCell className="font-medium">{loan.borrowerName}</TableCell>
                           <TableCell className="font-mono">{formatCurrency(loan.principalAmount)}</TableCell>
                           <TableCell className="font-mono">{loan.interestRate}%</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const dateObj = new Date(loan.startDate);
+                              const day = dateObj.getDate();
+                              const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                              const year = dateObj.getFullYear();
+                              const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                           day === 2 || day === 22 ? 'nd' :
+                                           day === 3 || day === 23 ? 'rd' : 'th';
+                              return `${day}${suffix} ${month}, ${year}`;
+                            })()
+                            }
+                          </TableCell>
                           <TableCell className="font-mono">{formatCurrency(loan.totalInterest)}</TableCell>
                           <TableCell className="font-mono">{formatCurrency(loan.totalPaid)}</TableCell>
                           <TableCell className="font-semibold font-mono">{formatCurrency(loan.balance)}</TableCell>
                           <TableCell className="font-mono text-red-600">{formatCurrency(loan.pendingInterest)}</TableCell>
                           <TableCell className="font-mono text-green-600">{formatCurrency(loan.dailyInterest)}</TableCell>
-                          <TableCell className="font-mono text-blue-600">{format(new Date(loan.interestClearedTillDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell className="font-mono text-blue-600">
+                            {loan.interestClearedTillDate ? (() => {
+                              const dateObj = new Date(loan.interestClearedTillDate);
+                              const day = dateObj.getDate();
+                              const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                              const year = dateObj.getFullYear();
+                              const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                           day === 2 || day === 22 ? 'nd' :
+                                           day === 3 || day === 23 ? 'rd' : 'th';
+                              return `${day}${suffix} ${month}, ${year}`;
+                            })() : 'No payments'}
+                          </TableCell>
                           <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                          <TableCell>{loan.dueDate ? format(new Date(loan.dueDate), 'MMM d, yyyy') : 'N/A'}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -259,17 +282,45 @@ export default function Reports() {
                       <TableHead>Borrower</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Method</TableHead>
+                      <TableHead>Interest Cleared Till</TableHead>
                       <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paymentHistory.map((payment) => (
                       <TableRow key={payment.id} data-testid={`row-payment-${payment.id}`}>
-                        <TableCell>{format(new Date(payment.paymentDate), 'MMM d, yyyy')}</TableCell>
+                        <TableCell>
+                          {(() => {
+                            const dateObj = new Date(payment.paymentDate);
+                            const day = dateObj.getDate();
+                            const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                            const year = dateObj.getFullYear();
+                            const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                         day === 2 || day === 22 ? 'nd' :
+                                         day === 3 || day === 23 ? 'rd' : 'th';
+                            return `${day}${suffix} ${month}, ${year}`;
+                          })()
+                          }
+                        </TableCell>
                         <TableCell className="font-medium">{payment.borrowerName}</TableCell>
                         <TableCell className="font-semibold font-mono">{formatCurrency(payment.amount)}</TableCell>
                         <TableCell>
                           <Badge className="hover-elevate">{payment.paymentMethod}</Badge>
+                        </TableCell>
+                        <TableCell className="font-mono text-green-600">
+                          {(payment as any).interestClearedTillDate 
+                            ? (() => {
+                                const dateObj = new Date((payment as any).interestClearedTillDate);
+                                const day = dateObj.getDate();
+                                const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                                const year = dateObj.getFullYear();
+                                const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                             day === 2 || day === 22 ? 'nd' :
+                                             day === 3 || day === 23 ? 'rd' : 'th';
+                                return `${day}${suffix} ${month}, ${year}`;
+                              })()
+                            : 'N/A'
+                          }
                         </TableCell>
                         <TableCell className="text-muted-foreground">{payment.notes || 'N/A'}</TableCell>
                       </TableRow>
@@ -410,7 +461,18 @@ export default function Reports() {
                           <TableCell className="font-semibold font-mono">{formatCurrency(borrower.balance)}</TableCell>
                           <TableCell className="font-mono text-red-600">{formatCurrency(borrower.pendingInterest)}</TableCell>
                           <TableCell className="font-mono text-green-600">{formatCurrency(borrower.dailyInterest)}</TableCell>
-                          <TableCell className="font-mono text-blue-600">{format(new Date(borrower.interestClearedTillDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell className="font-mono text-blue-600">
+                            {borrower.interestClearedTillDate ? (() => {
+                              const dateObj = new Date(borrower.interestClearedTillDate);
+                              const day = dateObj.getDate();
+                              const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                              const year = dateObj.getFullYear();
+                              const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                           day === 2 || day === 22 ? 'nd' :
+                                           day === 3 || day === 23 ? 'rd' : 'th';
+                              return `${day}${suffix} ${month}, ${year}`;
+                            })() : 'No payments'}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

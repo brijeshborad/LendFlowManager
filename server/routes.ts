@@ -501,10 +501,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.patch("/api/payments/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            // Convert paymentDate string to Date object if provided
+            // Convert date strings to Date objects if provided
             const updateData = {
                 ...req.body,
-                ...(req.body.paymentDate && { paymentDate: new Date(req.body.paymentDate) })
+                ...(req.body.paymentDate && { paymentDate: new Date(req.body.paymentDate) }),
+                ...(req.body.interestClearedTillDate && { interestClearedTillDate: new Date(req.body.interestClearedTillDate) })
             };
             const payment = await storage.updatePayment(req.params.id, userId, updateData);
 
@@ -772,12 +773,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     ? parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100) / 30
                     : 0;
 
-                // Calculate interest cleared till date
-                const monthlyInterestAmount = parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100);
-                const monthsCleared = monthlyInterestAmount > 0 ? Math.floor(interestPayments / monthlyInterestAmount) : 0;
-                const interestClearedTillDate = new Date(loan.startDate);
-                interestClearedTillDate.setMonth(interestClearedTillDate.getMonth() + monthsCleared);
-                interestClearedTillDate.setDate(interestClearedTillDate.getDate() - 1); // Last day of cleared month
+                // Get latest interest cleared till date from payments
+                const interestPaymentsWithDate = loanPayments
+                    .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
+                    .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
+                const latestInterestClearedDate = interestPaymentsWithDate.length > 0 
+                    ? interestPaymentsWithDate[0].interestClearedTillDate 
+                    : null;
 
                 return {
                     loanId: loan.id,
@@ -792,7 +794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     balance: parseFloat(balance.toFixed(2)),
                     pendingInterest: parseFloat(pendingInterest.toFixed(2)),
                     dailyInterest: parseFloat(dailyInterest.toFixed(2)),
-                    interestClearedTillDate: interestClearedTillDate.toISOString(),
+                    interestClearedTillDate: latestInterestClearedDate,
                     paymentCount: loanPayments.length,
                 };
             });
@@ -893,19 +895,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         return sum + (principal * dailyRate);
                     }, 0);
 
-                // Calculate interest cleared till date for borrower
-                const totalMonthlyInterest = borrowerLoans
-                    .filter(l => l.status === 'active')
-                    .reduce((sum, loan) => {
-                        return sum + (parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100));
-                    }, 0);
-                const monthsCleared = totalMonthlyInterest > 0 ? Math.floor(interestPayments / totalMonthlyInterest) : 0;
-                const oldestLoan = borrowerLoans.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
-                const interestClearedTillDate = oldestLoan ? new Date(oldestLoan.startDate) : new Date();
-                if (oldestLoan) {
-                    interestClearedTillDate.setMonth(interestClearedTillDate.getMonth() + monthsCleared);
-                    interestClearedTillDate.setDate(interestClearedTillDate.getDate() - 1);
-                }
+                // Get latest interest cleared till date from all borrower payments
+                const allBorrowerPayments = payments.filter(p => borrowerLoans.some(l => l.id === p.loanId));
+                const interestPaymentsWithDate = allBorrowerPayments
+                    .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
+                    .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
+                const latestInterestClearedDate = interestPaymentsWithDate.length > 0 
+                    ? interestPaymentsWithDate[0].interestClearedTillDate 
+                    : null;
 
                 return {
                     borrowerId: borrower.id,
@@ -919,7 +916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     balance: parseFloat(balance.toFixed(2)),
                     pendingInterest: parseFloat(pendingInterest.toFixed(2)),
                     dailyInterest: parseFloat(dailyInterest.toFixed(2)),
-                    interestClearedTillDate: interestClearedTillDate.toISOString(),
+                    interestClearedTillDate: latestInterestClearedDate,
                     activeLoans: borrowerLoans.filter(l => l.status === 'active').length,
                 };
             });

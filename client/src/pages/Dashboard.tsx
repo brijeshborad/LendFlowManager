@@ -653,6 +653,16 @@ export default function Dashboard() {
                           new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
                         )[0];
                         
+                        // Get latest interest cleared till date
+                        const getLatestInterestClearedDate = () => {
+                          const interestPayments = borrowerPayments
+                            .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
+                            .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
+                          return interestPayments[0]?.interestClearedTillDate || null;
+                        };
+                        
+                        const latestInterestClearedDate = getLatestInterestClearedDate();
+                        
                         return (
                           <BorrowerCard
                             key={borrower.id}
@@ -674,6 +684,16 @@ export default function Dashboard() {
                             daysSincePayment={lastPayment ? 
                               Math.floor((Date.now() - new Date(lastPayment.paymentDate).getTime()) / (1000 * 60 * 60 * 24))
                               : 0}
+                            interestClearedTillDate={latestInterestClearedDate ? (() => {
+                              const dateObj = new Date(latestInterestClearedDate);
+                              const day = dateObj.getDate();
+                              const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+                              const year = dateObj.getFullYear();
+                              const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                           day === 2 || day === 22 ? 'nd' :
+                                           day === 3 || day === 23 ? 'rd' : 'th';
+                              return `${day}${suffix} ${month}, ${year}`;
+                            })() : undefined}
                             status={borrower.status as 'active' | 'overdue' | 'settled'}
                             onViewDetails={handleViewDetails}
                             onAddPayment={handleAddPayment}
