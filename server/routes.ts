@@ -751,27 +751,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const loans = await storage.getLoans(userId);
             const payments = await storage.getPayments(userId);
             const borrowers = await storage.getBorrowers(userId);
-            const interestEntries = await getUserInterestEntries(userId);
+            const realTimeInterest = await calculateRealTimeInterestForUser(userId);
 
             const report = loans.map(loan => {
                 const borrower = borrowers.find(b => b.id === loan.borrowerId);
                 const loanPayments = payments.filter(p => p.loanId === loan.id);
-                const loanInterest = interestEntries.filter((i: any) => i.loanId === loan.id);
+                const loanInterest = realTimeInterest.find(i => i.loanId === loan.id);
                 const totalPaid = loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
-                const totalInterest = loanInterest.reduce((sum: number, i: any) => sum + parseFloat(i.interestAmount.toString()), 0);
+                const totalInterest = loanInterest?.totalInterest || 0;
                 const balance = parseFloat(loan.principalAmount.toString()) + totalInterest - totalPaid;
+                
+                // Calculate pending interest (total interest generated - interest payments)
+                const interestPayments = loanPayments
+                    .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+                const pendingInterest = totalInterest - interestPayments;
+                
+                // Calculate daily interest earning for active loans
+                const dailyInterest = loan.status === 'active' 
+                    ? parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100) / 30
+                    : 0;
+
+                // Calculate interest cleared till date
+                const monthlyInterestAmount = parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100);
+                const monthsCleared = monthlyInterestAmount > 0 ? Math.floor(interestPayments / monthlyInterestAmount) : 0;
+                const interestClearedTillDate = new Date(loan.startDate);
+                interestClearedTillDate.setMonth(interestClearedTillDate.getMonth() + monthsCleared);
+                interestClearedTillDate.setDate(interestClearedTillDate.getDate() - 1); // Last day of cleared month
 
                 return {
                     loanId: loan.id,
                     borrowerName: borrower?.name || 'Unknown',
-                    principalAmount: parseFloat(loan.principalAmount.toString()),
-                    interestRate: parseFloat(loan.interestRate.toString()),
+                    principalAmount: parseFloat(parseFloat(loan.principalAmount.toString()).toFixed(2)),
+                    interestRate: parseFloat(parseFloat(loan.interestRate.toString()).toFixed(2)),
                     startDate: loan.startDate,
                     dueDate: null,
                     status: loan.status || 'active',
-                    totalInterest,
-                    totalPaid,
-                    balance,
+                    totalInterest: parseFloat(totalInterest.toFixed(2)),
+                    totalPaid: parseFloat(totalPaid.toFixed(2)),
+                    balance: parseFloat(balance.toFixed(2)),
+                    pendingInterest: parseFloat(pendingInterest.toFixed(2)),
+                    dailyInterest: parseFloat(dailyInterest.toFixed(2)),
+                    interestClearedTillDate: interestClearedTillDate.toISOString(),
                     paymentCount: loanPayments.length,
                 };
             });
@@ -854,6 +875,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
 
                 const balance = totalPrincipal + totalInterest - totalPaid;
+                
+                // Calculate pending interest (total interest generated - interest payments)
+                const interestPayments = payments
+                    .filter(p => borrowerLoans.some(l => l.id === p.loanId) && 
+                           (p.paymentType === 'interest' || p.paymentType === 'partial_interest'))
+                    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
+                const pendingInterest = totalInterest - interestPayments;
+                
+                // Calculate daily interest earning for active loans
+                const dailyInterest = borrowerLoans
+                    .filter(l => l.status === 'active')
+                    .reduce((sum, loan) => {
+                        const principal = parseFloat(loan.principalAmount.toString());
+                        const monthlyRate = parseFloat(loan.interestRate.toString()) / 100;
+                        const dailyRate = monthlyRate / 30;
+                        return sum + (principal * dailyRate);
+                    }, 0);
+
+                // Calculate interest cleared till date for borrower
+                const totalMonthlyInterest = borrowerLoans
+                    .filter(l => l.status === 'active')
+                    .reduce((sum, loan) => {
+                        return sum + (parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100));
+                    }, 0);
+                const monthsCleared = totalMonthlyInterest > 0 ? Math.floor(interestPayments / totalMonthlyInterest) : 0;
+                const oldestLoan = borrowerLoans.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())[0];
+                const interestClearedTillDate = oldestLoan ? new Date(oldestLoan.startDate) : new Date();
+                if (oldestLoan) {
+                    interestClearedTillDate.setMonth(interestClearedTillDate.getMonth() + monthsCleared);
+                    interestClearedTillDate.setDate(interestClearedTillDate.getDate() - 1);
+                }
 
                 return {
                     borrowerId: borrower.id,
@@ -861,10 +913,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     email: borrower.email,
                     phone: borrower.phone,
                     loanCount: borrowerLoans.length,
-                    totalPrincipal,
-                    totalInterest,
-                    totalPaid,
-                    balance,
+                    totalPrincipal: parseFloat(totalPrincipal.toFixed(2)),
+                    totalInterest: parseFloat(totalInterest.toFixed(2)),
+                    totalPaid: parseFloat(totalPaid.toFixed(2)),
+                    balance: parseFloat(balance.toFixed(2)),
+                    pendingInterest: parseFloat(pendingInterest.toFixed(2)),
+                    dailyInterest: parseFloat(dailyInterest.toFixed(2)),
+                    interestClearedTillDate: interestClearedTillDate.toISOString(),
                     activeLoans: borrowerLoans.filter(l => l.status === 'active').length,
                 };
             });

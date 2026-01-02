@@ -18,6 +18,8 @@ type LoanSummaryItem = {
   totalInterest: number;
   totalPaid: number;
   balance: number;
+  pendingInterest: number;
+  dailyInterest: number;
   paymentCount: number;
 };
 
@@ -47,6 +49,8 @@ type BorrowerSummaryItem = {
   totalInterest: number;
   totalPaid: number;
   balance: number;
+  pendingInterest: number;
+  dailyInterest: number;
   activeLoans: number;
 };
 
@@ -193,34 +197,40 @@ export default function Reports() {
               ) : loanSummary.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No loans found</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Borrower</TableHead>
-                      <TableHead>Principal</TableHead>
-                      <TableHead>Interest Rate</TableHead>
-                      <TableHead>Interest Earned</TableHead>
-                      <TableHead>Paid</TableHead>
-                      <TableHead>Balance</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Due Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loanSummary.map((loan) => (
-                      <TableRow key={loan.loanId} data-testid={`row-loan-${loan.loanId}`}>
-                        <TableCell className="font-medium">{loan.borrowerName}</TableCell>
-                        <TableCell className="font-mono">{formatCurrency(loan.principalAmount)}</TableCell>
-                        <TableCell className="font-mono">{loan.interestRate}%</TableCell>
-                        <TableCell className="font-mono">{formatCurrency(loan.totalInterest)}</TableCell>
-                        <TableCell className="font-mono">{formatCurrency(loan.totalPaid)}</TableCell>
-                        <TableCell className="font-semibold font-mono">{formatCurrency(loan.balance)}</TableCell>
-                        <TableCell>{getStatusBadge(loan.status)}</TableCell>
-                        <TableCell>{loan.dueDate ? format(new Date(loan.dueDate), 'MMM d, yyyy') : 'N/A'}</TableCell>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Borrower</TableHead>
+                        <TableHead>Principal</TableHead>
+                        <TableHead>Interest Rate</TableHead>
+                        <TableHead>Interest Earned</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
+                        <TableHead>Pending Interest</TableHead>
+                        <TableHead>Daily Interest</TableHead>
+                        <TableHead>Interest Cleared Till</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Due Date</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {loanSummary.map((loan) => (
+                        <TableRow key={loan.loanId} data-testid={`row-loan-${loan.loanId}`}>
+                          <TableCell className="font-medium">{loan.borrowerName}</TableCell>
+                          <TableCell className="font-mono">{formatCurrency(loan.principalAmount)}</TableCell>
+                          <TableCell className="font-mono">{loan.interestRate}%</TableCell>
+                          <TableCell className="font-mono">{formatCurrency(loan.totalInterest)}</TableCell>
+                          <TableCell className="font-mono">{formatCurrency(loan.totalPaid)}</TableCell>
+                          <TableCell className="font-semibold font-mono">{formatCurrency(loan.balance)}</TableCell>
+                          <TableCell className="font-mono text-red-600">{formatCurrency(loan.pendingInterest)}</TableCell>
+                          <TableCell className="font-mono text-green-600">{formatCurrency(loan.dailyInterest)}</TableCell>
+                          <TableCell className="font-mono text-blue-600">{format(new Date(loan.interestClearedTillDate), 'MMM d, yyyy')}</TableCell>
+                          <TableCell>{getStatusBadge(loan.status)}</TableCell>
+                          <TableCell>{loan.dueDate ? format(new Date(loan.dueDate), 'MMM d, yyyy') : 'N/A'}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
               )}
             </CardContent>
           </Card>
@@ -376,6 +386,9 @@ export default function Reports() {
                         <TableHead>Interest</TableHead>
                         <TableHead>Paid</TableHead>
                         <TableHead>Balance</TableHead>
+                        <TableHead>Pending Interest</TableHead>
+                        <TableHead>Daily Interest</TableHead>
+                        <TableHead>Interest Cleared Till</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -395,6 +408,9 @@ export default function Reports() {
                           <TableCell className="font-mono">{formatCurrency(borrower.totalInterest)}</TableCell>
                           <TableCell className="font-mono">{formatCurrency(borrower.totalPaid)}</TableCell>
                           <TableCell className="font-semibold font-mono">{formatCurrency(borrower.balance)}</TableCell>
+                          <TableCell className="font-mono text-red-600">{formatCurrency(borrower.pendingInterest)}</TableCell>
+                          <TableCell className="font-mono text-green-600">{formatCurrency(borrower.dailyInterest)}</TableCell>
+                          <TableCell className="font-mono text-blue-600">{format(new Date(borrower.interestClearedTillDate), 'MMM d, yyyy')}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
