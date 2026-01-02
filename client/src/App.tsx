@@ -16,6 +16,7 @@ import Reports from "@/pages/Reports";
 import Reminders from "@/pages/Reminders";
 import EmailTemplates from "@/pages/EmailTemplates";
 import Settings from "@/pages/Settings";
+import PendingInterestCalculator from "@/pages/PendingInterestCalculator";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -42,6 +43,7 @@ function Router() {
           <Route path="/borrowers" component={Borrowers} />
           <Route path="/loans" component={Loans} />
           <Route path="/reports" component={Reports} />
+          <Route path="/calculator" component={PendingInterestCalculator} />
           <Route path="/reminders" component={Reminders} />
           <Route path="/templates" component={EmailTemplates} />
           <Route path="/settings" component={Settings} />

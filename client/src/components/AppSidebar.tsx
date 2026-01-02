@@ -1,4 +1,4 @@
-import { Home, Users, Wallet, TrendingUp, FileText, Settings, Bell, Mail } from "lucide-react";
+import { Home, Users, Wallet, TrendingUp, FileText, Settings, Bell, Mail, Calculator } from "lucide-react";
 import { Link } from "wouter";
 import {
   Sidebar,
@@ -32,6 +32,11 @@ const menuItems = [
     title: "Reports",
     url: "/reports",
     icon: FileText,
+  },
+  {
+    title: "Interest Calculator",
+    url: "/calculator",
+    icon: Calculator,
   },
 ];
 

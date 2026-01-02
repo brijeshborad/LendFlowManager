@@ -549,6 +549,67 @@ export class DatabaseStorage implements IStorage {
       };
     });
   }
+
+  async calculatePendingInterest(userId: string, borrowerId: string, tillDate: Date) {
+    const borrowerLoans = await db
+      .select()
+      .from(loans)
+      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+      .where(and(eq(borrowers.userId, userId), eq(loans.borrowerId, borrowerId)));
+    
+    const borrowerPayments = await db
+      .select()
+      .from(payments)
+      .innerJoin(loans, eq(payments.loanId, loans.id))
+      .where(and(
+        eq(loans.borrowerId, borrowerId),
+        lte(payments.paymentDate, tillDate)
+      ));
+    
+    let totalPendingInterest = 0;
+    const loanDetails = [];
+    
+    for (const loanRow of borrowerLoans) {
+      const loan = loanRow.loans;
+      const loanPayments = borrowerPayments.filter(p => p.payments.loanId === loan.id);
+      
+      // Calculate interest from loan start to tillDate
+      const startDate = new Date(loan.startDate);
+      const endDate = tillDate > startDate ? tillDate : startDate;
+      const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + (endDate.getMonth() - startDate.getMonth());
+      const daysDiff = endDate.getDate() - startDate.getDate();
+      const totalMonths = monthsDiff + (daysDiff > 0 ? daysDiff / 30 : 0);
+      
+      const principal = parseFloat(loan.principalAmount.toString());
+      const monthlyRate = parseFloat(loan.interestRate.toString()) / 100;
+      const totalInterestTillDate = principal * monthlyRate * totalMonths;
+      
+      // Calculate interest payments till date
+      const interestPaidTillDate = loanPayments
+        .filter(p => p.payments.paymentType === 'interest' || p.payments.paymentType === 'partial_interest')
+        .reduce((sum, p) => sum + parseFloat(p.payments.amount.toString()), 0);
+      
+      const pendingInterest = Math.max(0, totalInterestTillDate - interestPaidTillDate);
+      totalPendingInterest += pendingInterest;
+      
+      loanDetails.push({
+        loanId: loan.id,
+        principalAmount: principal,
+        interestRate: parseFloat(loan.interestRate.toString()),
+        startDate: loan.startDate,
+        totalInterestTillDate: parseFloat(totalInterestTillDate.toFixed(2)),
+        interestPaidTillDate: parseFloat(interestPaidTillDate.toFixed(2)),
+        pendingInterest: parseFloat(pendingInterest.toFixed(2)),
+      });
+    }
+    
+    return {
+      borrowerId,
+      tillDate: tillDate.toISOString(),
+      totalPendingInterest: parseFloat(totalPendingInterest.toFixed(2)),
+      loanDetails,
+    };
+  }
 }
 
 export const storage = new DatabaseStorage();
