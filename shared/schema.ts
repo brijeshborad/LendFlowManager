@@ -90,7 +90,11 @@ export const borrowers = pgTable("borrowers", {
   status: text("status").default("active"), // "active", "overdue", "settled"
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("idx_borrowers_user_id").on(table.userId),
+  statusIdx: index("idx_borrowers_status").on(table.status),
+  userStatusIdx: index("idx_borrowers_user_status").on(table.userId, table.status),
+}));
 
 export const insertBorrowerSchema = createInsertSchema(borrowers).omit({
   id: true,
@@ -116,7 +120,14 @@ export const loans = pgTable("loans", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("idx_loans_user_id").on(table.userId),
+  borrowerIdIdx: index("idx_loans_borrower_id").on(table.borrowerId),
+  statusIdx: index("idx_loans_status").on(table.status),
+  startDateIdx: index("idx_loans_start_date").on(table.startDate),
+  userBorrowerIdx: index("idx_loans_user_borrower").on(table.userId, table.borrowerId),
+  borrowerStatusIdx: index("idx_loans_borrower_status").on(table.borrowerId, table.status),
+}));
 
 export const insertLoanSchema = createInsertSchema(loans).omit({
   id: true,
@@ -143,7 +154,15 @@ export const payments = pgTable("payments", {
   verified: boolean("verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("idx_payments_user_id").on(table.userId),
+  loanIdIdx: index("idx_payments_loan_id").on(table.loanId),
+  paymentDateIdx: index("idx_payments_payment_date").on(table.paymentDate),
+  paymentTypeIdx: index("idx_payments_payment_type").on(table.paymentType),
+  userLoanIdx: index("idx_payments_user_loan").on(table.userId, table.loanId),
+  loanTypeIdx: index("idx_payments_loan_type").on(table.loanId, table.paymentType),
+  userDateIdx: index("idx_payments_user_date").on(table.userId, table.paymentDate.desc()),
+}));
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({
   id: true,
@@ -200,7 +219,12 @@ export const reminders = pgTable("reminders", {
   }>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("idx_reminders_user_id").on(table.userId),
+  borrowerIdIdx: index("idx_reminders_borrower_id").on(table.borrowerId),
+  scheduledForIdx: index("idx_reminders_scheduled_for").on(table.scheduledFor),
+  statusIdx: index("idx_reminders_status").on(table.status),
+}));
 
 export const insertReminderSchema = createInsertSchema(reminders).omit({
   id: true,
@@ -270,7 +294,11 @@ export const auditLogs = pgTable("audit_logs", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => ({
+  userIdIdx: index("idx_audit_logs_user_id").on(table.userId),
+  createdAtIdx: index("idx_audit_logs_created_at").on(table.createdAt),
+  entityIdx: index("idx_audit_logs_entity").on(table.entityType, table.entityId),
+}));
 
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
   id: true,

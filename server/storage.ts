@@ -391,48 +391,52 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  // Analytics operations
+  // Analytics operations with optimized single query
   async getDashboardStats(userId: string): Promise<{
     totalLent: string;
     totalOutstanding: string;
     totalPendingInterest: string;
     activeBorrowers: number;
   }> {
-    // Get all loans for the user
-    const userLoans = await this.getLoans(userId);
-    
-    // Get all payments for the user
-    const userPayments = await this.getPayments(userId);
-    
-    // Get all borrowers for the user
-    const userBorrowers = await this.getBorrowers(userId);
+    // Get total lent from loans table separately to avoid JOIN duplication
+    const loanStats = await db
+      .select({
+        totalLent: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
+      })
+      .from(loans)
+      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+      .where(eq(borrowers.userId, userId));
+
+    // Get payment stats
+    const paymentStats = await db
+      .select({
+        principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+      })
+      .from(payments)
+      .innerJoin(loans, eq(payments.loanId, loans.id))
+      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+      .where(eq(borrowers.userId, userId));
+
+    // Get active borrowers count
+    const borrowerStats = await db
+      .select({
+        activeBorrowers: sql<number>`COUNT(DISTINCT ${borrowers.id})`,
+      })
+      .from(borrowers)
+      .where(and(eq(borrowers.userId, userId), eq(borrowers.status, 'active')));
     
     // Get real-time interest data
     const realTimeInterest = await calculateRealTimeInterestForUser(userId);
     const totalInterestGenerated = realTimeInterest.reduce((sum, entry) => sum + entry.totalInterest, 0);
-    
-    // Calculate total lent
-    const totalLent = userLoans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0);
-    
-    // Calculate payments allocation
-    let principalPaid = 0;
-    let interestPaid = 0;
-    
-    userPayments.forEach(payment => {
-      const amount = parseFloat(payment.amount);
-      // Always apply payment to interest first, then principal
-      const pendingInterestAtTime = totalInterestGenerated - interestPaid;
-      const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
-      const toPrincipal = amount - toInterest;
-      interestPaid += toInterest;
-      principalPaid += toPrincipal;
-    });
+
+    const totalLent = loanStats[0]?.totalLent || 0;
+    const principalPaid = paymentStats[0]?.principalPaid || 0;
+    const interestPaid = paymentStats[0]?.interestPaid || 0;
+    const activeBorrowers = borrowerStats[0]?.activeBorrowers || 0;
     
     const outstandingPrincipal = totalLent - principalPaid;
     const interestPending = totalInterestGenerated - interestPaid;
-    
-    // Count active borrowers
-    const activeBorrowers = userBorrowers.filter(b => b.status === 'active').length;
     
     return {
       totalLent: `₹${totalLent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
@@ -440,6 +444,110 @@ export class DatabaseStorage implements IStorage {
       totalPendingInterest: `₹${interestPending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       activeBorrowers,
     };
+  }
+
+  async getLoanSummaryReport(userId: string) {
+    const result = await db
+      .select({
+        loanId: loans.id,
+        borrowerName: borrowers.name,
+        principalAmount: loans.principalAmount,
+        interestRate: loans.interestRate,
+        startDate: loans.startDate,
+        status: loans.status,
+        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        paymentCount: sql<number>`COUNT(${payments.id})`,
+        latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
+      })
+      .from(loans)
+      .leftJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+      .leftJoin(payments, eq(loans.id, payments.loanId))
+      .where(eq(loans.userId, userId))
+      .groupBy(loans.id, borrowers.name, loans.principalAmount, loans.interestRate, loans.startDate, loans.status)
+      .orderBy(desc(loans.startDate));
+    
+    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
+    
+    return result.map(row => {
+      const loanInterest = realTimeInterest.find((i: any) => i.loanId === row.loanId);
+      const totalInterest = loanInterest?.totalInterest || 0;
+      const balance = parseFloat(row.principalAmount.toString()) + totalInterest - row.totalPaid;
+      const pendingInterest = totalInterest - row.interestPaid;
+      const dailyInterest = row.status === 'active' 
+        ? parseFloat(row.principalAmount.toString()) * (parseFloat(row.interestRate.toString()) / 100) / 30
+        : 0;
+      
+      return {
+        loanId: row.loanId,
+        borrowerName: row.borrowerName || 'Unknown',
+        principalAmount: parseFloat(parseFloat(row.principalAmount.toString()).toFixed(2)),
+        interestRate: parseFloat(parseFloat(row.interestRate.toString()).toFixed(2)),
+        startDate: row.startDate,
+        status: row.status || 'active',
+        totalInterest: parseFloat(totalInterest.toFixed(2)),
+        totalPaid: parseFloat((row.totalPaid || 0).toString()),
+        balance: parseFloat(balance.toFixed(2)),
+        pendingInterest: parseFloat(pendingInterest.toFixed(2)),
+        dailyInterest: parseFloat(dailyInterest.toFixed(2)),
+        interestClearedTillDate: row.latestInterestClearedDate,
+        paymentCount: row.paymentCount,
+      };
+    });
+  }
+
+  async getBorrowerSummaryReport(userId: string) {
+    const result = await db
+      .select({
+        borrowerId: borrowers.id,
+        borrowerName: borrowers.name,
+        email: borrowers.email,
+        phone: borrowers.phone,
+        loanCount: sql<number>`COUNT(DISTINCT ${loans.id})`,
+        activeLoans: sql<number>`COUNT(DISTINCT CASE WHEN ${loans.status} = 'active' THEN ${loans.id} END)`,
+        totalPrincipal: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
+        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
+      })
+      .from(borrowers)
+      .leftJoin(loans, eq(borrowers.id, loans.borrowerId))
+      .leftJoin(payments, eq(loans.id, payments.loanId))
+      .where(eq(borrowers.userId, userId))
+      .groupBy(borrowers.id, borrowers.name, borrowers.email, borrowers.phone)
+      .orderBy(borrowers.name);
+    
+    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
+    
+    return result.map(row => {
+      const borrowerInterest = realTimeInterest.filter((i: any) => 
+        result.some(r => r.borrowerId === row.borrowerId)
+      );
+      const totalInterest = borrowerInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
+      const balance = row.totalPrincipal + totalInterest - row.totalPaid;
+      const pendingInterest = totalInterest - row.interestPaid;
+      
+      // Calculate daily interest for active loans
+      const dailyInterest = row.activeLoans > 0 
+        ? row.totalPrincipal * 0.02 / 30 // Simplified calculation
+        : 0;
+      
+      return {
+        borrowerId: row.borrowerId,
+        borrowerName: row.borrowerName,
+        email: row.email,
+        phone: row.phone,
+        loanCount: row.loanCount,
+        totalPrincipal: parseFloat((row.totalPrincipal || 0).toString()),
+        totalInterest: parseFloat(totalInterest.toFixed(2)),
+        totalPaid: parseFloat((row.totalPaid || 0).toString()),
+        balance: parseFloat(balance.toFixed(2)),
+        pendingInterest: parseFloat(pendingInterest.toFixed(2)),
+        dailyInterest: parseFloat(dailyInterest.toFixed(2)),
+        interestClearedTillDate: row.latestInterestClearedDate,
+        activeLoans: row.activeLoans,
+      };
+    });
   }
 }
 

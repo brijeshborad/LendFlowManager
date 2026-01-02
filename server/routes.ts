@@ -745,60 +745,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
-    // Reports
+    // Reports with optimized queries
     app.get("/api/reports/loan-summary", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const loans = await storage.getLoans(userId);
-            const payments = await storage.getPayments(userId);
-            const borrowers = await storage.getBorrowers(userId);
-            const realTimeInterest = await calculateRealTimeInterestForUser(userId);
-
-            const report = loans.map(loan => {
-                const borrower = borrowers.find(b => b.id === loan.borrowerId);
-                const loanPayments = payments.filter(p => p.loanId === loan.id);
-                const loanInterest = realTimeInterest.find(i => i.loanId === loan.id);
-                const totalPaid = loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
-                const totalInterest = loanInterest?.totalInterest || 0;
-                const balance = parseFloat(loan.principalAmount.toString()) + totalInterest - totalPaid;
-                
-                // Calculate pending interest (total interest generated - interest payments)
-                const interestPayments = loanPayments
-                    .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-                    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
-                const pendingInterest = totalInterest - interestPayments;
-                
-                // Calculate daily interest earning for active loans
-                const dailyInterest = loan.status === 'active' 
-                    ? parseFloat(loan.principalAmount.toString()) * (parseFloat(loan.interestRate.toString()) / 100) / 30
-                    : 0;
-
-                // Get latest interest cleared till date from payments
-                const interestPaymentsWithDate = loanPayments
-                    .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
-                    .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
-                const latestInterestClearedDate = interestPaymentsWithDate.length > 0 
-                    ? interestPaymentsWithDate[0].interestClearedTillDate 
-                    : null;
-
-                return {
-                    loanId: loan.id,
-                    borrowerName: borrower?.name || 'Unknown',
-                    principalAmount: parseFloat(parseFloat(loan.principalAmount.toString()).toFixed(2)),
-                    interestRate: parseFloat(parseFloat(loan.interestRate.toString()).toFixed(2)),
-                    startDate: loan.startDate,
-                    dueDate: null,
-                    status: loan.status || 'active',
-                    totalInterest: parseFloat(totalInterest.toFixed(2)),
-                    totalPaid: parseFloat(totalPaid.toFixed(2)),
-                    balance: parseFloat(balance.toFixed(2)),
-                    pendingInterest: parseFloat(pendingInterest.toFixed(2)),
-                    dailyInterest: parseFloat(dailyInterest.toFixed(2)),
-                    interestClearedTillDate: latestInterestClearedDate,
-                    paymentCount: loanPayments.length,
-                };
-            });
-
+            
+            // Single optimized query with JOINs
+            const report = await storage.getLoanSummaryReport(userId);
             res.json(report);
         } catch (error: any) {
             console.error("Error fetching loan summary report:", error);
@@ -856,71 +809,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.get("/api/reports/borrower-summary", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const borrowers = await storage.getBorrowers(userId);
-            const loans = await storage.getLoans(userId);
-            const payments = await storage.getPayments(userId);
-            const realTimeInterest = await calculateRealTimeInterestForUser(userId);
-
-            const report = borrowers.map(borrower => {
-                const borrowerLoans = loans.filter(l => l.borrowerId === borrower.id);
-                const totalPrincipal = borrowerLoans.reduce((sum, l) => sum + parseFloat(l.principalAmount.toString()), 0);
-
-                let totalPaid = 0;
-                let totalInterest = 0;
-
-                borrowerLoans.forEach(loan => {
-                    const loanPayments = payments.filter(p => p.loanId === loan.id);
-                    const loanInterest = realTimeInterest.find(i => i.loanId === loan.id);
-                    
-                    totalPaid += loanPayments.reduce((sum: number, p) => sum + parseFloat(p.amount.toString()), 0);
-                    totalInterest += loanInterest?.totalInterest || 0;
-                });
-
-                const balance = totalPrincipal + totalInterest - totalPaid;
-                
-                // Calculate pending interest (total interest generated - interest payments)
-                const interestPayments = payments
-                    .filter(p => borrowerLoans.some(l => l.id === p.loanId) && 
-                           (p.paymentType === 'interest' || p.paymentType === 'partial_interest'))
-                    .reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
-                const pendingInterest = totalInterest - interestPayments;
-                
-                // Calculate daily interest earning for active loans
-                const dailyInterest = borrowerLoans
-                    .filter(l => l.status === 'active')
-                    .reduce((sum, loan) => {
-                        const principal = parseFloat(loan.principalAmount.toString());
-                        const monthlyRate = parseFloat(loan.interestRate.toString()) / 100;
-                        const dailyRate = monthlyRate / 30;
-                        return sum + (principal * dailyRate);
-                    }, 0);
-
-                // Get latest interest cleared till date from all borrower payments
-                const allBorrowerPayments = payments.filter(p => borrowerLoans.some(l => l.id === p.loanId));
-                const interestPaymentsWithDate = allBorrowerPayments
-                    .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
-                    .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
-                const latestInterestClearedDate = interestPaymentsWithDate.length > 0 
-                    ? interestPaymentsWithDate[0].interestClearedTillDate 
-                    : null;
-
-                return {
-                    borrowerId: borrower.id,
-                    borrowerName: borrower.name,
-                    email: borrower.email,
-                    phone: borrower.phone,
-                    loanCount: borrowerLoans.length,
-                    totalPrincipal: parseFloat(totalPrincipal.toFixed(2)),
-                    totalInterest: parseFloat(totalInterest.toFixed(2)),
-                    totalPaid: parseFloat(totalPaid.toFixed(2)),
-                    balance: parseFloat(balance.toFixed(2)),
-                    pendingInterest: parseFloat(pendingInterest.toFixed(2)),
-                    dailyInterest: parseFloat(dailyInterest.toFixed(2)),
-                    interestClearedTillDate: latestInterestClearedDate,
-                    activeLoans: borrowerLoans.filter(l => l.status === 'active').length,
-                };
-            });
-
+            
+            // Single optimized query with JOINs
+            const report = await storage.getBorrowerSummaryReport(userId);
             res.json(report);
         } catch (error: any) {
             console.error("Error fetching borrower summary report:", error);

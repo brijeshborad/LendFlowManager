@@ -32,26 +32,31 @@ export default function Dashboard() {
   // Fetch dashboard stats
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
+    staleTime: 30000, // 30 seconds
   });
 
   // Fetch borrowers
   const { data: borrowers = [], isLoading: borrowersLoading } = useQuery<Borrower[]>({
     queryKey: ['/api/borrowers'],
+    staleTime: 60000, // 1 minute
   });
 
   // Fetch real-time interest data
   const { data: realTimeInterest = [] } = useQuery({
     queryKey: ['/api/interest/real-time'],
+    staleTime: 30000, // 30 seconds
   });
 
   // Fetch all loans
   const { data: loans = [] } = useQuery<Loan[]>({
     queryKey: ['/api/loans'],
+    staleTime: 60000, // 1 minute
   });
 
   // Fetch all payments
   const { data: payments = [] } = useQuery<Payment[]>({
     queryKey: ['/api/payments'],
+    staleTime: 30000, // 30 seconds
   });
 
   const [chartTimeRange, setChartTimeRange] = useState(6);
