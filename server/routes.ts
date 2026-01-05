@@ -819,6 +819,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    app.get("/api/reports/borrower-report", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const borrowerId = req.query.borrowerId as string;
+            const tillDate = req.query.tillDate as string;
+            
+            if (!borrowerId || !tillDate) {
+                return res.status(400).json({message: "borrowerId and tillDate are required"});
+            }
+            
+            const report = await storage.generateBorrowerReport(userId, borrowerId, new Date(tillDate));
+            res.json(report);
+        } catch (error: any) {
+            console.error("Error generating borrower report:", error);
+            res.status(500).json({message: "Failed to generate borrower report"});
+        }
+    });
+
     app.get("/api/reports/pending-interest", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
@@ -829,8 +847,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 return res.status(400).json({message: "borrowerId and tillDate are required"});
             }
             
-            const result = await storage.calculatePendingInterest(userId, borrowerId, new Date(tillDate));
-            res.json(result);
+            if (borrowerId === "all") {
+                const result = await storage.calculatePendingInterestForAllBorrowers(userId, new Date(tillDate));
+                res.json(result);
+            } else {
+                const result = await storage.calculatePendingInterest(userId, borrowerId, new Date(tillDate));
+                res.json(result);
+            }
         } catch (error: any) {
             console.error("Error calculating pending interest:", error);
             res.status(500).json({message: "Failed to calculate pending interest"});

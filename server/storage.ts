@@ -550,6 +550,182 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async generateBorrowerReport(userId: string, borrowerId: string, tillDate: Date) {
+    const borrower = await this.getBorrower(borrowerId, userId);
+    if (!borrower) throw new Error("Borrower not found");
+    
+    const borrowerLoans = await db
+      .select()
+      .from(loans)
+      .where(and(eq(loans.borrowerId, borrowerId), eq(loans.userId, userId)));
+    
+    const borrowerPayments = await db
+      .select()
+      .from(payments)
+      .innerJoin(loans, eq(payments.loanId, loans.id))
+      .where(and(
+        eq(loans.borrowerId, borrowerId),
+        lte(payments.paymentDate, tillDate)
+      ));
+    
+    let totalInterestGenerated = 0;
+    let totalInterestPaid = 0;
+    const loanDetails = [];
+    const monthlyBreakdown = [];
+    
+    for (const loan of borrowerLoans) {
+      const loanPayments = borrowerPayments.filter(p => p.payments.loanId === loan.id);
+      const startDate = new Date(loan.startDate);
+      const principal = parseFloat(loan.principalAmount.toString());
+      const interestRate = parseFloat(loan.interestRate.toString());
+      
+      // Calculate total interest for this loan
+      let adjustedDays = 0;
+      let currentDate = new Date(startDate);
+      const endDate = tillDate > startDate ? tillDate : startDate;
+      
+      while (currentDate < endDate) {
+        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const monthEnd = endOfMonth < endDate ? endOfMonth : endDate;
+        const daysToCount = Math.ceil((monthEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        adjustedDays += Math.min(daysToCount, 30);
+        
+        if (monthEnd === endOfMonth && currentDate.getDate() === 1) {
+          adjustedDays = adjustedDays - daysToCount + 30;
+        }
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
+      }
+      
+      const exactMonths = adjustedDays / 30;
+      let loanInterestGenerated;
+      if (loan.interestRateType === 'monthly') {
+        loanInterestGenerated = principal * (interestRate / 100) * exactMonths;
+      } else {
+        loanInterestGenerated = principal * (interestRate / 100 / 12) * exactMonths;
+      }
+      
+      const loanInterestPaid = loanPayments
+        .filter(p => p.payments.paymentType === 'interest' || p.payments.paymentType === 'partial_interest')
+        .reduce((sum, p) => sum + parseFloat(p.payments.amount.toString()), 0);
+      
+      totalInterestGenerated += loanInterestGenerated;
+      totalInterestPaid += loanInterestPaid;
+      
+      // Store loan details
+      loanDetails.push({
+        loanId: loan.id,
+        startDate: formatDate(loan.startDate),
+        principalAmount: principal,
+        interestRate: interestRate,
+        interestRateType: loan.interestRateType,
+        monthlyInterest: loan.interestRateType === 'monthly' 
+          ? principal * (interestRate / 100)
+          : principal * (interestRate / 100 / 12)
+      });
+      
+      // Generate month-by-month breakdown for this loan
+      let monthStart = new Date(startDate);
+      let cumulativeInterest = 0;
+      let cumulativePaid = 0;
+      
+      while (monthStart < endDate) {
+        const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+        const monthEndDate = monthEnd < endDate ? monthEnd : endDate;
+        
+        // Calculate partial month interest for first and last months
+        const daysInMonth = Math.min(
+          Math.ceil((monthEndDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1,
+          30
+        );
+        
+        const fullMonthlyInterest = loan.interestRateType === 'monthly' 
+          ? principal * (interestRate / 100)
+          : principal * (interestRate / 100 / 12);
+        
+        const monthlyInterest = (fullMonthlyInterest / 30) * daysInMonth;
+        cumulativeInterest += monthlyInterest;
+        
+        const monthPayments = loanPayments.filter(p => {
+          const paymentDate = new Date(p.payments.paymentDate);
+          return paymentDate >= monthStart && paymentDate <= monthEndDate &&
+                 (p.payments.paymentType === 'interest' || p.payments.paymentType === 'partial_interest');
+        });
+        
+        const monthInterestPaid = monthPayments.reduce((sum, p) => sum + parseFloat(p.payments.amount.toString()), 0);
+        cumulativePaid += monthInterestPaid;
+        
+        monthlyBreakdown.push({
+          loanId: loan.id,
+          month: `${monthStart.toLocaleDateString('en-IN', { month: 'short' })} ${monthStart.getFullYear()}`,
+          daysInMonth: daysInMonth,
+          monthlyInterest: parseFloat(monthlyInterest.toFixed(2)),
+          cumulativeInterest: parseFloat(cumulativeInterest.toFixed(2)),
+          monthInterestPaid: parseFloat(monthInterestPaid.toFixed(2)),
+          cumulativePaid: parseFloat(cumulativePaid.toFixed(2)),
+          pendingInterest: parseFloat((cumulativeInterest - cumulativePaid).toFixed(2))
+        });
+        
+        monthStart.setMonth(monthStart.getMonth() + 1);
+        monthStart.setDate(1);
+      }
+    }
+    
+    function formatDate(date: Date | string) {
+      const dateObj = typeof date === 'string' ? new Date(date) : date;
+      const day = dateObj.getDate();
+      const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
+      const year = dateObj.getFullYear();
+      const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                     day === 2 || day === 22 ? 'nd' :
+                     day === 3 || day === 23 ? 'rd' : 'th';
+      return `${day}${suffix} ${month}, ${year}`;
+    }
+    
+    return {
+      borrowerName: borrower.name,
+      tillDate: tillDate.toISOString(),
+      totalLoans: borrowerLoans.length,
+      totalInterestGenerated: parseFloat(totalInterestGenerated.toFixed(2)),
+      totalInterestPaid: parseFloat(totalInterestPaid.toFixed(2)),
+      totalPendingInterest: parseFloat((totalInterestGenerated - totalInterestPaid).toFixed(2)),
+      loanDetails,
+      monthlyBreakdown
+    };
+  }
+
+  async calculatePendingInterestForAllBorrowers(userId: string, tillDate: Date) {
+    const allBorrowers = await db
+      .select()
+      .from(borrowers)
+      .where(eq(borrowers.userId, userId));
+    
+    let totalPendingInterest = 0;
+    const borrowerDetails = [];
+    
+    for (const borrower of allBorrowers) {
+      const result = await this.calculatePendingInterest(userId, borrower.id, tillDate);
+      totalPendingInterest += result.totalPendingInterest;
+      
+      if (result.totalPendingInterest > 0) {
+        borrowerDetails.push({
+          borrowerId: borrower.id,
+          borrowerName: borrower.name,
+          totalPendingInterest: result.totalPendingInterest,
+          loanDetails: result.loanDetails,
+        });
+      }
+    }
+    
+    return {
+      tillDate: tillDate.toISOString(),
+      totalPendingInterest: parseFloat(totalPendingInterest.toFixed(2)),
+      borrowerDetails,
+    };
+  }
+
   async calculatePendingInterest(userId: string, borrowerId: string, tillDate: Date) {
     const borrowerLoans = await db
       .select()
