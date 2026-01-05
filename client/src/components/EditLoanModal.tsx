@@ -30,12 +30,14 @@ interface EditLoanModalProps {
 
 export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
   const { toast } = useToast();
+  const [principalAmount, setPrincipalAmount] = useState("");
   const [interestRate, setInterestRate] = useState("");
   const [interestRateType, setInterestRateType] = useState("monthly");
   const [startDate, setStartDate] = useState("");
 
   useEffect(() => {
     if (loan && open) {
+      setPrincipalAmount(loan.principalAmount.toString());
       setInterestRate(loan.interestRate.toString());
       setInterestRateType(loan.interestRateType);
       const dateStr = typeof loan.startDate === 'string' 
@@ -47,6 +49,7 @@ export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
 
   const updateLoanMutation = useMutation({
     mutationFn: async (data: {
+      principalAmount: string;
       interestRate: string;
       interestRateType: string;
       startDate: string;
@@ -78,6 +81,7 @@ export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
     e.preventDefault();
 
     updateLoanMutation.mutate({
+      principalAmount,
       interestRate,
       interestRateType,
       startDate,
@@ -96,12 +100,27 @@ export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
         <DialogHeader>
           <DialogTitle>Edit Loan Details</DialogTitle>
           <DialogDescription>
-            Update interest rate and start date for this loan
+            Update loan amount, interest rate and start date for this loan
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-principal-amount">Principal Amount (₹) *</Label>
+              <Input
+                id="edit-principal-amount"
+                type="number"
+                placeholder="100000"
+                required
+                min="1"
+                step="0.01"
+                value={principalAmount}
+                onChange={(e) => setPrincipalAmount(e.target.value)}
+                disabled={updateLoanMutation.isPending}
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="edit-interest-rate">Interest Rate (%) *</Label>
               <Input

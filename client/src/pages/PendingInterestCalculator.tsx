@@ -445,35 +445,47 @@ export default function PendingInterestCalculator() {
                 </div>
               </div>
 
-              {modalData.monthlyBreakdown && modalData.monthlyBreakdown.length > 0 && (
-                <div>
-                  <h4 className="font-semibold mb-2">Monthly Breakdown</h4>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Month</TableHead>
-                        <TableHead>Days</TableHead>
-                        <TableHead>Monthly Interest</TableHead>
-                        <TableHead>Cumulative Interest</TableHead>
-                        <TableHead>Interest Paid (Month)</TableHead>
-                        <TableHead>Cumulative Paid</TableHead>
-                        <TableHead>Pending Interest</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {modalData.monthlyBreakdown.map((month: any, index: number) => (
-                        <TableRow key={index}>
-                          <TableCell>{month.month}</TableCell>
-                          <TableCell className="font-mono">{month.daysInMonth}</TableCell>
-                          <TableCell className="font-mono">{formatCurrency(month.monthlyInterest)}</TableCell>
-                          <TableCell className="font-mono">{formatCurrency(month.cumulativeInterest)}</TableCell>
-                          <TableCell className="font-mono text-green-600">{formatCurrency(month.monthInterestPaid)}</TableCell>
-                          <TableCell className="font-mono text-green-600">{formatCurrency(month.cumulativePaid)}</TableCell>
-                          <TableCell className="font-mono text-red-600 font-semibold">{formatCurrency(month.pendingInterest)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+              {modalData.monthlyBreakdown && modalData.monthlyBreakdown.length > 0 && modalData.loanDetails && modalData.loanDetails.length > 0 && (
+                <div className="space-y-6">
+                  {modalData.loanDetails.map((loan: any, index: number) => {
+                    const loanBreakdown = modalData.monthlyBreakdown.filter((month: any) => month.loanId === loan.loanId);
+                    return (
+                      <div key={loan.loanId || index}>
+                        <div className="flex items-center gap-4 mb-3">
+                          <h4 className="font-semibold">Loan {index + 1} - Monthly Breakdown</h4>
+                          <div className="text-sm text-muted-foreground">
+                            Start: {loan.startDate} | Principal: {formatCurrency(loan.principalAmount)} | Rate: {loan.interestRate}% {loan.interestRateType}
+                          </div>
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Month</TableHead>
+                              <TableHead>Days</TableHead>
+                              <TableHead>Monthly Interest</TableHead>
+                              <TableHead>Cumulative Interest</TableHead>
+                              <TableHead>Interest Paid (Month)</TableHead>
+                              <TableHead>Cumulative Paid</TableHead>
+                              <TableHead>Pending Interest</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {loanBreakdown.map((month: any, monthIndex: number) => (
+                              <TableRow key={monthIndex}>
+                                <TableCell>{month.month}</TableCell>
+                                <TableCell className="font-mono text-center">{month.daysInMonth}</TableCell>
+                                <TableCell className="font-mono text-right">{formatCurrency(month.monthlyInterest)}</TableCell>
+                                <TableCell className="font-mono text-right">{formatCurrency(month.cumulativeInterest)}</TableCell>
+                                <TableCell className="font-mono text-green-600 text-right">{formatCurrency(month.monthInterestPaid)}</TableCell>
+                                <TableCell className="font-mono text-green-600 text-right">{formatCurrency(month.cumulativePaid)}</TableCell>
+                                <TableCell className="font-mono text-red-600 font-semibold text-right">{formatCurrency(month.pendingInterest)}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
