@@ -191,14 +191,6 @@ export const interestEntries = pgTable("interest_entries", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const insertInterestEntrySchema = createInsertSchema(interestEntries).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertInterestEntry = z.infer<typeof insertInterestEntrySchema>;
-export type InterestEntry = typeof interestEntries.$inferSelect;
-
 // Reminders table
 export const reminders = pgTable("reminders", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),

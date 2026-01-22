@@ -339,127 +339,110 @@ export default function Dashboard() {
       </div>
 
       {statsLoading ? (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
-            ))}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[6, 7].map((i) => (
-              <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
-            ))}
-          </div>
-        </>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+            <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
+          ))}
+        </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-            <SummaryCard
-              title="Total Amount Lent"
-              value={formatCurrency(stats?.totalLent || 0) || "₹0"}
-              subValue="All time"
-              icon={LucideIndianRupee}
-              iconColor="bg-blue-500"
-              data-testid="card-total-lent"
-            />
-            <SummaryCard
-              title="Outstanding Principal"
-              value={stats?.totalOutstanding || "₹0"}
-              icon={Banknote}
-              iconColor="bg-orange-500"
-              data-testid="card-outstanding"
-            />
-            <SummaryCard
-              title="Total Paid Interest"
-              value={formatCurrency(payments
-                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-                .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
-              subValue="Collected"
-              icon={TrendingUp}
-              iconColor="bg-emerald-500"
-              data-testid="card-paid-interest"
-            />
-            <SummaryCard
-              title="Pending Interest"
-              value={stats?.totalPendingInterest || "₹0"}
-              icon={TrendingUp}
-              iconColor="bg-red-500"
-              data-testid="card-pending-interest"
-            />
-            <SummaryCard
-              title="Active Borrowers"
-              value={String(stats?.activeBorrowers || 0)}
-              subValue={`${borrowers.length} total`}
-              icon={Users}
-              iconColor="bg-purple-500"
-              data-testid="card-active-borrowers"
-            />
-          </div>
-        </>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+          <SummaryCard
+            title="Total Amount Lent"
+            value={formatCurrency(stats?.totalLent || 0) || "₹0"}
+            subValue="All time"
+            icon={LucideIndianRupee}
+            iconColor="bg-blue-500"
+            data-testid="card-total-lent"
+          />
+          <SummaryCard
+            title="Outstanding Principal"
+            value={stats?.totalOutstanding || "₹0"}
+            icon={Banknote}
+            iconColor="bg-orange-500"
+            data-testid="card-outstanding"
+          />
+          <SummaryCard
+            title="Total Paid Interest"
+            value={formatCurrency(payments
+              .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+              .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
+            subValue="Collected"
+            icon={TrendingUp}
+            iconColor="bg-emerald-500"
+            data-testid="card-paid-interest"
+          />
+          <SummaryCard
+            title="Pending Interest"
+            value={stats?.totalPendingInterest || "₹0"}
+            icon={TrendingUp}
+            iconColor="bg-red-500"
+            data-testid="card-pending-interest"
+          />
+          <SummaryCard
+            title="Active Borrowers"
+            value={String(stats?.activeBorrowers || 0)}
+            subValue={`${borrowers.length} total`}
+            icon={Users}
+            iconColor="bg-purple-500"
+            data-testid="card-active-borrowers"
+          />
+          <SummaryCard
+            title="Daily Interest Earning"
+            value={formatCurrency(additionalMetrics.dailyInterest)}
+            subValue="Per day"
+            icon={TrendingUp}
+            iconColor="bg-green-500"
+            data-testid="card-daily-interest"
+          />
+          <SummaryCard
+            title="Monthly Interest Earning"
+            value={formatCurrency(additionalMetrics.monthlyInterest)}
+            subValue="Per month"
+            icon={TrendingUp}
+            iconColor="bg-teal-500"
+            data-testid="card-monthly-interest"
+          />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Average Loan Size</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono" data-testid="text-avg-loan-size">
+                ₹{additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Across {loans.length} loans
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Average Interest Rate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono" data-testid="text-avg-interest-rate">
+                {additionalMetrics.avgInterestRate.toFixed(2)}%
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Per month
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Interest Earned</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold font-mono text-green-600" data-testid="text-total-interest-earned">
+                ₹{additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Real-time calculation
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       )}
-
-      {/* Additional Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-
-          <SummaryCard
-              title="Daily Interest Earning"
-              value={formatCurrency(additionalMetrics.dailyInterest)}
-              subValue="Per day"
-              icon={TrendingUp}
-              iconColor="bg-green-500"
-              data-testid="card-daily-interest"
-          />
-          <SummaryCard
-              title="Monthly Interest Earning"
-              value={formatCurrency(additionalMetrics.monthlyInterest)}
-              subValue="Per month"
-              icon={TrendingUp}
-              iconColor="bg-teal-500"
-              data-testid="card-monthly-interest"
-          />
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average Loan Size</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-avg-loan-size">
-              ₹{additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Across {loans.length} loans
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Average Interest Rate</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono" data-testid="text-avg-interest-rate">
-              {additionalMetrics.avgInterestRate.toFixed(2)}%
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Per month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Interest Earned</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold font-mono text-green-600" data-testid="text-total-interest-earned">
-              ₹{additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Real-time calculation
-            </p>
-          </CardContent>
-        </Card>
-      </div>
 
       {borrowersLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -478,20 +461,7 @@ export default function Dashboard() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" style={{ height: '500px' }}>
-            <div className="lg:col-span-2 h-full">
-              <InterestChart
-                title={`Payment Trends (Last ${chartTimeRange === 1 ? '1 Month' : chartTimeRange === 3 ? '3 Months' : chartTimeRange === 6 ? '6 Months' : '1 Year'})`}
-                data={chartData}
-                timeRange={chartTimeRange}
-                onTimeRangeChange={setChartTimeRange}
-                onExport={() => console.log('Export chart')}
-              />
-            </div>
-            <div className="h-full">
-              <ActivityFeed activities={activities} />
-            </div>
-          </div>
+
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>

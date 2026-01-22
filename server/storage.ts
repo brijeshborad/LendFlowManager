@@ -456,6 +456,7 @@ export class DatabaseStorage implements IStorage {
         startDate: loans.startDate,
         status: loans.status,
         totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         paymentCount: sql<number>`COUNT(${payments.id})`,
         latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
@@ -472,24 +473,21 @@ export class DatabaseStorage implements IStorage {
     return result.map(row => {
       const loanInterest = realTimeInterest.find((i: any) => i.loanId === row.loanId);
       const totalInterest = loanInterest?.totalInterest || 0;
-      const balance = parseFloat(row.principalAmount.toString()) + totalInterest - row.totalPaid;
+      const principalAmount = parseFloat(row.principalAmount.toString());
+      const outstandingPrincipal = principalAmount - row.principalPaid;
       const pendingInterest = totalInterest - row.interestPaid;
-      const dailyInterest = row.status === 'active' 
-        ? parseFloat(row.principalAmount.toString()) * (parseFloat(row.interestRate.toString()) / 100) / 30
-        : 0;
       
       return {
         loanId: row.loanId,
         borrowerName: row.borrowerName || 'Unknown',
-        principalAmount: parseFloat(parseFloat(row.principalAmount.toString()).toFixed(2)),
+        principalAmount: parseFloat(principalAmount.toFixed(2)),
+        outstandingPrincipal: parseFloat(outstandingPrincipal.toFixed(2)),
         interestRate: parseFloat(parseFloat(row.interestRate.toString()).toFixed(2)),
         startDate: row.startDate,
         status: row.status || 'active',
         totalInterest: parseFloat(totalInterest.toFixed(2)),
         totalPaid: parseFloat((row.totalPaid || 0).toString()),
-        balance: parseFloat(balance.toFixed(2)),
         pendingInterest: parseFloat(pendingInterest.toFixed(2)),
-        dailyInterest: parseFloat(dailyInterest.toFixed(2)),
         interestClearedTillDate: row.latestInterestClearedDate,
         paymentCount: row.paymentCount,
       };
@@ -507,6 +505,7 @@ export class DatabaseStorage implements IStorage {
         activeLoans: sql<number>`COUNT(DISTINCT CASE WHEN ${loans.status} = 'active' THEN ${loans.id} END)`,
         totalPrincipal: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
         totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
       })
@@ -524,13 +523,8 @@ export class DatabaseStorage implements IStorage {
         result.some(r => r.borrowerId === row.borrowerId)
       );
       const totalInterest = borrowerInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
-      const balance = row.totalPrincipal + totalInterest - row.totalPaid;
+      const outstandingPrincipal = row.totalPrincipal - row.principalPaid;
       const pendingInterest = totalInterest - row.interestPaid;
-      
-      // Calculate daily interest for active loans
-      const dailyInterest = row.activeLoans > 0 
-        ? row.totalPrincipal * 0.02 / 30 // Simplified calculation
-        : 0;
       
       return {
         borrowerId: row.borrowerId,
@@ -539,11 +533,10 @@ export class DatabaseStorage implements IStorage {
         phone: row.phone,
         loanCount: row.loanCount,
         totalPrincipal: parseFloat((row.totalPrincipal || 0).toString()),
+        outstandingPrincipal: parseFloat(outstandingPrincipal.toFixed(2)),
         totalInterest: parseFloat(totalInterest.toFixed(2)),
         totalPaid: parseFloat((row.totalPaid || 0).toString()),
-        balance: parseFloat(balance.toFixed(2)),
         pendingInterest: parseFloat(pendingInterest.toFixed(2)),
-        dailyInterest: parseFloat(dailyInterest.toFixed(2)),
         interestClearedTillDate: row.latestInterestClearedDate,
         activeLoans: row.activeLoans,
       };
@@ -579,32 +572,74 @@ export class DatabaseStorage implements IStorage {
       const principal = parseFloat(loan.principalAmount.toString());
       const interestRate = parseFloat(loan.interestRate.toString());
       
-      // Calculate total interest for this loan
-      let adjustedDays = 0;
+      // Calculate interest with principal payments - use same logic as borrower report
+      let loanInterestGenerated = 0;
+      let currentPrincipal = principal;
       let currentDate = new Date(startDate);
-      const endDate = tillDate > startDate ? tillDate : startDate;
       
-      while (currentDate < endDate) {
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const monthEnd = endOfMonth < endDate ? endOfMonth : endDate;
-        const daysToCount = Math.ceil((monthEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+      // Get principal payments for this loan
+      const principalPayments = loanPayments
+        .filter(p => p.payments.paymentType === 'principal')
+        .map(p => ({
+          date: new Date(p.payments.paymentDate),
+          amount: parseFloat(p.payments.amount.toString())
+        }))
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Calculate month by month
+      while (currentDate < tillDate) {
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const monthEndDate = monthEnd < tillDate ? monthEnd : tillDate;
         
-        adjustedDays += Math.min(daysToCount, 30);
+        // Get payments in this month
+        const monthPayments = principalPayments.filter(p => 
+          p.date >= currentDate && p.date <= monthEndDate
+        );
         
-        if (monthEnd === endOfMonth && currentDate.getDate() === 1) {
-          adjustedDays = adjustedDays - daysToCount + 30;
+        let monthInterest = 0;
+        
+        if (monthPayments.length === 0) {
+          // No payments this month
+          if (currentDate.getTime() === new Date(startDate).getTime()) {
+            // First month
+            const daysFromStart = 30 - new Date(startDate).getDate() + 1;
+            monthInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysFromStart / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysFromStart / 30);
+          } else {
+            // Complete month
+            monthInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100)
+              : currentPrincipal * (interestRate / 100 / 12);
+          }
+        } else {
+          // Has payments - split calculation
+          for (const payment of monthPayments) {
+            const daysBefore = payment.date.getDate();
+            const periodInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
+            monthInterest += periodInterest;
+            
+            currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+          }
+          
+          // Days after last payment
+          const lastPayment = monthPayments[monthPayments.length - 1];
+          const daysAfter = 30 - lastPayment.date.getDate();
+          if (daysAfter > 0) {
+            const periodInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
+            monthInterest += periodInterest;
+          }
         }
         
+        loanInterestGenerated += monthInterest;
+        
+        // Move to next month
         currentDate.setMonth(currentDate.getMonth() + 1);
         currentDate.setDate(1);
-      }
-      
-      const exactMonths = adjustedDays / 30;
-      let loanInterestGenerated;
-      if (loan.interestRateType === 'monthly') {
-        loanInterestGenerated = principal * (interestRate / 100) * exactMonths;
-      } else {
-        loanInterestGenerated = principal * (interestRate / 100 / 12) * exactMonths;
       }
       
       const loanInterestPaid = loanPayments
@@ -614,7 +649,6 @@ export class DatabaseStorage implements IStorage {
       totalInterestGenerated += loanInterestGenerated;
       totalInterestPaid += loanInterestPaid;
       
-      // Store loan details
       loanDetails.push({
         loanId: loan.id,
         startDate: formatDate(loan.startDate),
@@ -626,28 +660,87 @@ export class DatabaseStorage implements IStorage {
           : principal * (interestRate / 100 / 12)
       });
       
-      // Generate month-by-month breakdown for this loan
+      // Generate month-by-month breakdown with proper period splits
       let monthStart = new Date(startDate);
       let cumulativeInterest = 0;
       let cumulativePaid = 0;
+      let runningPrincipal = principal;
       
-      while (monthStart < endDate) {
+      while (monthStart < tillDate) {
         const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
-        const monthEndDate = monthEnd < endDate ? monthEnd : endDate;
+        const monthEndDate = monthEnd < tillDate ? monthEnd : tillDate;
         
-        // Calculate partial month interest for first and last months
-        const daysInMonth = Math.min(
-          Math.ceil((monthEndDate.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1,
-          30
-        );
+        // Get principal payments in this month
+        const monthPrincipalPayments = principalPayments
+          .filter(p => p.date >= monthStart && p.date <= monthEndDate)
+          .sort((a, b) => a.date.getTime() - b.date.getTime());
         
-        const fullMonthlyInterest = loan.interestRateType === 'monthly' 
-          ? principal * (interestRate / 100)
-          : principal * (interestRate / 100 / 12);
+        let monthlyInterest = 0;
+        let calculationNote = '';
+        let daysInMonth = 30; // Always show 30 for display
         
-        const monthlyInterest = (fullMonthlyInterest / 30) * daysInMonth;
+        if (monthPrincipalPayments.length === 0) {
+          // No payments this month
+          if (monthStart.getTime() === new Date(startDate).getTime()) {
+            // First month - calculate from start date
+            const startDay = new Date(startDate).getDate();
+            const daysFromStart = 30 - startDay + 1;
+            daysInMonth = daysFromStart;
+            monthlyInterest = loan.interestRateType === 'monthly'
+              ? runningPrincipal * (interestRate / 100) * (daysFromStart / 30)
+              : runningPrincipal * (interestRate / 100 / 12) * (daysFromStart / 30);
+          } else if (monthEndDate < tillDate) {
+            // Complete month
+            monthlyInterest = loan.interestRateType === 'monthly'
+              ? runningPrincipal * (interestRate / 100)
+              : runningPrincipal * (interestRate / 100 / 12);
+          } else {
+            // Last partial month
+            const endDay = tillDate.getDate();
+            daysInMonth = endDay;
+            monthlyInterest = loan.interestRateType === 'monthly'
+              ? runningPrincipal * (interestRate / 100) * (endDay / 30)
+              : runningPrincipal * (interestRate / 100 / 12) * (endDay / 30);
+          }
+        } else {
+          // Has payments - split calculation
+          let periodStart = new Date(monthStart);
+          let currentPeriodPrincipal = runningPrincipal;
+          let breakdownParts = [];
+          
+          for (const payment of monthPrincipalPayments) {
+            // Days before payment (from 1st to payment date)
+            const daysBefore = payment.date.getDate();
+            if (daysBefore > 0) {
+              const periodInterest = loan.interestRateType === 'monthly'
+                ? currentPeriodPrincipal * (interestRate / 100) * (daysBefore / 30)
+                : currentPeriodPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
+              monthlyInterest += periodInterest;
+              breakdownParts.push(`${daysBefore}d@₹${currentPeriodPrincipal.toLocaleString()}`);
+            }
+            
+            // Reduce principal
+            currentPeriodPrincipal = Math.max(0, currentPeriodPrincipal - payment.amount);
+          }
+          
+          // Days after last payment (from payment date to end of month)
+          const lastPayment = monthPrincipalPayments[monthPrincipalPayments.length - 1];
+          const daysAfter = 30 - lastPayment.date.getDate();
+          if (daysAfter > 0) {
+            const periodInterest = loan.interestRateType === 'monthly'
+              ? currentPeriodPrincipal * (interestRate / 100) * (daysAfter / 30)
+              : currentPeriodPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
+            monthlyInterest += periodInterest;
+            breakdownParts.push(`${daysAfter}d@₹${currentPeriodPrincipal.toLocaleString()}`);
+          }
+          
+          calculationNote = breakdownParts.join('+');
+          runningPrincipal = currentPeriodPrincipal;
+        }
+        
         cumulativeInterest += monthlyInterest;
         
+        // Get interest payments for this month
         const monthPayments = loanPayments.filter(p => {
           const paymentDate = new Date(p.payments.paymentDate);
           return paymentDate >= monthStart && paymentDate <= monthEndDate &&
@@ -655,19 +748,24 @@ export class DatabaseStorage implements IStorage {
         });
         
         const monthInterestPaid = monthPayments.reduce((sum, p) => sum + parseFloat(p.payments.amount.toString()), 0);
+        const monthPrincipalPaid = monthPrincipalPayments.reduce((sum, p) => sum + p.amount, 0);
         cumulativePaid += monthInterestPaid;
         
         monthlyBreakdown.push({
           loanId: loan.id,
           month: `${monthStart.toLocaleDateString('en-IN', { month: 'short' })} ${monthStart.getFullYear()}`,
           daysInMonth: daysInMonth,
+          principalBalance: parseFloat((runningPrincipal + monthPrincipalPaid).toFixed(2)),
           monthlyInterest: parseFloat(monthlyInterest.toFixed(2)),
           cumulativeInterest: parseFloat(cumulativeInterest.toFixed(2)),
           monthInterestPaid: parseFloat(monthInterestPaid.toFixed(2)),
+          monthPrincipalPaid: parseFloat(monthPrincipalPaid.toFixed(2)),
           cumulativePaid: parseFloat(cumulativePaid.toFixed(2)),
-          pendingInterest: parseFloat((cumulativeInterest - cumulativePaid).toFixed(2))
+          pendingInterest: parseFloat((cumulativeInterest - cumulativePaid).toFixed(2)),
+          calculationNote
         });
         
+        // Move to next month
         monthStart.setMonth(monthStart.getMonth() + 1);
         monthStart.setDate(1);
       }
@@ -749,40 +847,87 @@ export class DatabaseStorage implements IStorage {
       const loan = loanRow.loans;
       const loanPayments = borrowerPayments.filter(p => p.payments.loanId === loan.id);
       
-      // Use same 30-day calculation logic as calculateRealTimeInterest
       const startDate = new Date(loan.startDate);
       const endDate = tillDate > startDate ? tillDate : startDate;
-      
-      // Calculate days treating all months as exactly 30 days
-      let adjustedDays = 0;
-      let currentDate = new Date(startDate);
-      
-      while (currentDate < endDate) {
-        const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-        const monthEnd = endOfMonth < endDate ? endOfMonth : endDate;
-        const daysToCount = Math.ceil((monthEnd.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        // Always count exactly 30 days per month (treat all months as 30 days)
-        adjustedDays += Math.min(daysToCount, 30);
-        
-        // If we've completed a full month, always add 30 days regardless of actual month length
-        if (monthEnd === endOfMonth && currentDate.getDate() === 1) {
-          adjustedDays = adjustedDays - daysToCount + 30;
-        }
-        
-        currentDate.setMonth(currentDate.getMonth() + 1);
-        currentDate.setDate(1);
-      }
-      
-      const exactMonths = adjustedDays / 30;
       const principal = parseFloat(loan.principalAmount.toString());
       const interestRate = parseFloat(loan.interestRate.toString());
       
-      let totalInterestTillDate;
-      if (loan.interestRateType === 'monthly') {
-        totalInterestTillDate = principal * (interestRate / 100) * exactMonths;
-      } else {
-        totalInterestTillDate = principal * (interestRate / 100 / 12) * exactMonths;
+      // Calculate interest considering principal payments
+      let totalInterestTillDate = 0;
+      let currentPrincipal = principal;
+      let currentDate = new Date(startDate);
+      
+      // Get principal payments for this loan
+      const principalPayments = loanPayments
+        .filter(p => p.payments.paymentType === 'principal')
+        .map(p => ({
+          date: new Date(p.payments.paymentDate),
+          amount: parseFloat(p.payments.amount.toString())
+        }))
+        .sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Add end date as final event
+      const paymentEvents = [...principalPayments, { date: endDate, amount: 0 }];
+      
+      // Calculate interest considering principal payments - use same logic as monthly breakdown
+      totalInterestTillDate = 0;
+      currentPrincipal = principal;
+      currentDate = new Date(startDate);
+      
+      // Calculate month by month
+      while (currentDate < endDate) {
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const monthEndDate = monthEnd < endDate ? monthEnd : endDate;
+        
+        // Get payments in this month
+        const monthPayments = principalPayments.filter(p => 
+          p.date >= currentDate && p.date <= monthEndDate
+        );
+        
+        let monthInterest = 0;
+        
+        if (monthPayments.length === 0) {
+          // No payments this month
+          if (currentDate.getTime() === new Date(startDate).getTime()) {
+            // First month
+            const daysFromStart = 30 - new Date(startDate).getDate() + 1;
+            monthInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysFromStart / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysFromStart / 30);
+          } else {
+            // Complete month
+            monthInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100)
+              : currentPrincipal * (interestRate / 100 / 12);
+          }
+        } else {
+          // Has payments - split calculation
+          for (const payment of monthPayments) {
+            const daysBefore = payment.date.getDate();
+            const periodInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
+            monthInterest += periodInterest;
+            
+            currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+          }
+          
+          // Days after last payment
+          const lastPayment = monthPayments[monthPayments.length - 1];
+          const daysAfter = 30 - lastPayment.date.getDate();
+          if (daysAfter > 0) {
+            const periodInterest = loan.interestRateType === 'monthly'
+              ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
+              : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
+            monthInterest += periodInterest;
+          }
+        }
+        
+        totalInterestTillDate += monthInterest;
+        
+        // Move to next month
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
       }
       
       // Calculate interest payments till date

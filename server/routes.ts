@@ -569,6 +569,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    // Test endpoint for interest calculation example
+    app.get("/api/interest/example", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const { calculateExampleInterest } = await import('./interestCalculationExample');
+            const result = calculateExampleInterest();
+            res.json(result);
+        } catch (error: any) {
+            console.error("Error running interest example:", error);
+            res.status(500).json({message: "Failed to run interest example"});
+        }
+    });
+
     // Interest Entry routes (deprecated - using real-time calculation)
     // app.get("/api/interest-entries", ...)
 

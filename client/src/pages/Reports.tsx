@@ -201,14 +201,13 @@ export default function Reports() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Borrower</TableHead>
-                        <TableHead>Principal</TableHead>
-                        <TableHead>Interest Rate</TableHead>
+                        <TableHead>Principal & Rate</TableHead>
                         <TableHead>Start Date</TableHead>
+                        <TableHead>Total Paid</TableHead>
+                        <TableHead>Outstanding Principal</TableHead>
                         <TableHead>Interest Earned</TableHead>
-                        <TableHead>Paid</TableHead>
-                        <TableHead>Balance</TableHead>
                         <TableHead>Pending Interest</TableHead>
-                        <TableHead>Daily Interest</TableHead>
+                        <TableHead>Total Outstanding</TableHead>
                         <TableHead>Interest Cleared Till</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
@@ -217,8 +216,10 @@ export default function Reports() {
                       {loanSummary.map((loan) => (
                         <TableRow key={loan.loanId} data-testid={`row-loan-${loan.loanId}`}>
                           <TableCell className="font-medium">{loan.borrowerName}</TableCell>
-                          <TableCell className="font-mono">{formatCurrency(loan.principalAmount)}</TableCell>
-                          <TableCell className="font-mono">{loan.interestRate}%</TableCell>
+                          <TableCell>
+                            <div className="font-mono font-semibold">{formatCurrency(loan.principalAmount)}</div>
+                            <div className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded">{loan.interestRate}% rate</div>
+                          </TableCell>
                           <TableCell>
                             {(() => {
                               const dateObj = new Date(loan.startDate);
@@ -232,11 +233,11 @@ export default function Reports() {
                             })()
                             }
                           </TableCell>
-                          <TableCell className="font-mono">{formatCurrency(loan.totalInterest)}</TableCell>
                           <TableCell className="font-mono">{formatCurrency(loan.totalPaid)}</TableCell>
-                          <TableCell className="font-semibold font-mono">{formatCurrency(loan.balance)}</TableCell>
+                          <TableCell className="font-mono text-orange-600">{formatCurrency((loan.principalAmount || 0) - (loan.totalPaid || 0))}</TableCell>
+                          <TableCell className="font-mono text-blue-600">{formatCurrency(loan.totalInterest)}</TableCell>
                           <TableCell className="font-mono text-red-600">{formatCurrency(loan.pendingInterest)}</TableCell>
-                          <TableCell className="font-mono text-green-600">{formatCurrency(loan.dailyInterest)}</TableCell>
+                          <TableCell className="font-semibold font-mono text-red-600">{formatCurrency(((loan.principalAmount || 0) - (loan.totalPaid || 0)) + (loan.pendingInterest || 0))}</TableCell>
                           <TableCell className="font-mono text-blue-600">
                             {loan.interestClearedTillDate ? (() => {
                               const dateObj = new Date(loan.interestClearedTillDate);
@@ -431,14 +432,13 @@ export default function Reports() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Borrower</TableHead>
-                        <TableHead>Contact</TableHead>
                         <TableHead>Loans</TableHead>
-                        <TableHead>Principal</TableHead>
+                        <TableHead>Total Amount Lent</TableHead>
+                        <TableHead>Outstanding Principal</TableHead>
                         <TableHead>Interest</TableHead>
                         <TableHead>Paid</TableHead>
-                        <TableHead>Balance</TableHead>
                         <TableHead>Pending Interest</TableHead>
-                        <TableHead>Daily Interest</TableHead>
+                        <TableHead>Total Outstanding</TableHead>
                         <TableHead>Interest Cleared Till</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -446,21 +446,17 @@ export default function Reports() {
                       {borrowerSummary.map((borrower) => (
                         <TableRow key={borrower.borrowerId} data-testid={`row-borrower-${borrower.borrowerId}`}>
                           <TableCell className="font-medium">{borrower.borrowerName}</TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {borrower.email}<br />
-                            {borrower.phone}
-                          </TableCell>
                           <TableCell>
                             <Badge className="hover-elevate">
                               {borrower.activeLoans} active / {borrower.loanCount} total
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-mono">{formatCurrency(borrower.totalPrincipal)}</TableCell>
-                          <TableCell className="font-mono">{formatCurrency(borrower.totalInterest)}</TableCell>
+                          <TableCell className="font-mono text-blue-600">{formatCurrency(borrower.totalPrincipal)}</TableCell>
+                          <TableCell className="font-mono text-orange-600">{formatCurrency((borrower.totalPrincipal || 0) - (borrower.totalPaid || 0))}</TableCell>
+                          <TableCell className="font-mono text-blue-600">{formatCurrency(borrower.totalInterest)}</TableCell>
                           <TableCell className="font-mono">{formatCurrency(borrower.totalPaid)}</TableCell>
-                          <TableCell className="font-semibold font-mono">{formatCurrency(borrower.balance)}</TableCell>
                           <TableCell className="font-mono text-red-600">{formatCurrency(borrower.pendingInterest)}</TableCell>
-                          <TableCell className="font-mono text-green-600">{formatCurrency(borrower.dailyInterest)}</TableCell>
+                          <TableCell className="font-semibold font-mono text-red-600">{formatCurrency(((borrower.totalPrincipal || 0) - (borrower.totalPaid || 0)) + (borrower.pendingInterest || 0))}</TableCell>
                           <TableCell className="font-mono text-blue-600">
                             {borrower.interestClearedTillDate ? (() => {
                               const dateObj = new Date(borrower.interestClearedTillDate);

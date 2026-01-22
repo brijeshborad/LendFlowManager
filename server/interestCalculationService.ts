@@ -1,5 +1,5 @@
 import { db } from './db';
-import { loans, interestEntries, borrowers } from '@shared/schema';
+import { loans, interestEntries, borrowers, payments } from '@shared/schema';
 import { eq, and, sql } from 'drizzle-orm';
 
 export interface InterestCalculation {
@@ -75,6 +75,102 @@ function calculateRealTimeInterest(
 }
 
 /**
+ * Calculate interest considering principal payments that reduce outstanding balance
+ */
+export async function calculateInterestWithPrincipalPayments(
+  loanId: string,
+  principalAmount: number,
+  interestRate: number,
+  interestRateType: 'monthly' | 'annual',
+  startDate: Date,
+  endDate: Date = new Date()
+): Promise<number> {
+  // Get all principal payments for this loan
+  const principalPayments = await db
+    .select({
+      paymentDate: payments.paymentDate,
+      amount: payments.amount
+    })
+    .from(payments)
+    .where(and(
+      eq(payments.loanId, loanId),
+      eq(payments.paymentType, 'principal')
+    ))
+    .orderBy(payments.paymentDate);
+
+  let totalInterest = 0;
+  let currentPrincipal = principalAmount;
+  let currentDate = new Date(startDate);
+  
+  // Calculate month by month
+  while (currentDate < endDate) {
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    const monthEndDate = monthEnd < endDate ? monthEnd : endDate;
+    
+    // Get payments in this month
+    const monthPayments = principalPayments
+      .map(p => ({
+        date: new Date(p.paymentDate),
+        amount: parseFloat(p.amount.toString())
+      }))
+      .filter(p => p.date >= currentDate && p.date <= monthEndDate);
+    
+    let monthInterest = 0;
+    
+    if (monthPayments.length === 0) {
+      // No payments this month
+      if (currentDate.getTime() === new Date(startDate).getTime()) {
+        // First month - calculate from start date
+        const daysFromStart = 30 - new Date(startDate).getDate() + 1;
+        monthInterest = interestRateType === 'monthly'
+          ? currentPrincipal * (interestRate / 100) * (daysFromStart / 30)
+          : currentPrincipal * (interestRate / 100 / 12) * (daysFromStart / 30);
+      } else if (monthEndDate.getTime() === endDate.getTime() && endDate.getDate() !== 30) {
+        // Last partial month
+        const daysInPartialMonth = endDate.getDate();
+        monthInterest = interestRateType === 'monthly'
+          ? currentPrincipal * (interestRate / 100) * (daysInPartialMonth / 30)
+          : currentPrincipal * (interestRate / 100 / 12) * (daysInPartialMonth / 30);
+      } else {
+        // Complete month
+        monthInterest = interestRateType === 'monthly'
+          ? currentPrincipal * (interestRate / 100)
+          : currentPrincipal * (interestRate / 100 / 12);
+      }
+    } else {
+      // Has payments - split calculation
+      for (const payment of monthPayments) {
+        const daysBefore = payment.date.getDate();
+        const periodInterest = interestRateType === 'monthly'
+          ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
+          : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
+        monthInterest += periodInterest;
+        
+        currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+      }
+      
+      // Days after last payment
+      const lastPayment = monthPayments[monthPayments.length - 1];
+      const daysAfter = 30 - lastPayment.date.getDate();
+      if (daysAfter > 0) {
+        const periodInterest = interestRateType === 'monthly'
+          ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
+          : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
+        monthInterest += periodInterest;
+      }
+    }
+    
+    totalInterest += monthInterest;
+    
+    // Move to next month
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    currentDate.setDate(1);
+  }
+  
+  return totalInterest;
+}
+
+/**
  * Calculate total interest for all active loans in real-time
  */
 export async function calculateRealTimeInterestForUser(userId: string) {
@@ -87,24 +183,29 @@ export async function calculateRealTimeInterestForUser(userId: string) {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Set to start of today
 
-    const loanInterests = activeLoans.map(loan => {
+    const loanInterests = [];
+    
+    for (const loan of activeLoans) {
       const principal = parseFloat(loan.principalAmount);
       const rate = parseFloat(loan.interestRate);
-      const totalInterest = calculateRealTimeInterest(
+      
+      // Use new calculation method that considers principal payments
+      const totalInterest = await calculateInterestWithPrincipalPayments(
+        loan.id,
         principal,
         rate,
         loan.interestRateType as 'monthly' | 'annual',
         new Date(loan.startDate),
-        today // Use today instead of default
+        today
       );
       
-      return {
+      loanInterests.push({
         loanId: loan.id,
         borrowerId: loan.borrowerId,
         totalInterest,
         startDate: loan.startDate
-      };
-    });
+      });
+    }
 
     return loanInterests;
   } catch (error) {

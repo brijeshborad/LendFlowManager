@@ -175,9 +175,11 @@ export default function PendingInterestCalculator() {
             <tr>
                 <th style="text-align: left;">Month</th>
                 <th style="text-align: center;">Days</th>
+                <th style="text-align: right;">Principal Balance</th>
                 <th style="text-align: right;">Monthly Interest</th>
                 <th style="text-align: right;">Cumulative Interest</th>
                 <th style="text-align: right;">Interest Paid (Month)</th>
+                <th style="text-align: right;">Principal Paid (Month)</th>
                 <th style="text-align: right;">Cumulative Paid</th>
                 <th style="text-align: right;">Pending Interest</th>
             </tr>
@@ -187,9 +189,11 @@ export default function PendingInterestCalculator() {
             <tr>
                 <td>${month.month}</td>
                 <td style="text-align: center;">${month.daysInMonth}</td>
+                <td class="amount">₹${month.principalBalance.toLocaleString('en-IN')}</td>
                 <td class="amount">₹${month.monthlyInterest.toLocaleString('en-IN')}</td>
                 <td class="amount">₹${month.cumulativeInterest.toLocaleString('en-IN')}</td>
                 <td class="amount paid">₹${month.monthInterestPaid.toLocaleString('en-IN')}</td>
+                <td class="amount" style="color: #007bff;">₹${month.monthPrincipalPaid.toLocaleString('en-IN')}</td>
                 <td class="amount paid">₹${month.cumulativePaid.toLocaleString('en-IN')}</td>
                 <td class="amount pending">₹${month.pendingInterest.toLocaleString('en-IN')}</td>
             </tr>
@@ -462,11 +466,14 @@ export default function PendingInterestCalculator() {
                             <TableRow>
                               <TableHead>Month</TableHead>
                               <TableHead>Days</TableHead>
+                              <TableHead>Principal Balance</TableHead>
                               <TableHead>Monthly Interest</TableHead>
                               <TableHead>Cumulative Interest</TableHead>
-                              <TableHead>Interest Paid (Month)</TableHead>
+                              <TableHead>Interest Paid</TableHead>
+                              <TableHead>Principal Paid</TableHead>
                               <TableHead>Cumulative Paid</TableHead>
                               <TableHead>Pending Interest</TableHead>
+                              <TableHead>Notes</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -474,11 +481,14 @@ export default function PendingInterestCalculator() {
                               <TableRow key={monthIndex}>
                                 <TableCell>{month.month}</TableCell>
                                 <TableCell className="font-mono text-center">{month.daysInMonth}</TableCell>
+                                <TableCell className="font-mono text-right">{formatCurrency(month.principalBalance)}</TableCell>
                                 <TableCell className="font-mono text-right">{formatCurrency(month.monthlyInterest)}</TableCell>
                                 <TableCell className="font-mono text-right">{formatCurrency(month.cumulativeInterest)}</TableCell>
                                 <TableCell className="font-mono text-green-600 text-right">{formatCurrency(month.monthInterestPaid)}</TableCell>
+                                <TableCell className="font-mono text-blue-600 text-right">{formatCurrency(month.monthPrincipalPaid)}</TableCell>
                                 <TableCell className="font-mono text-green-600 text-right">{formatCurrency(month.cumulativePaid)}</TableCell>
                                 <TableCell className="font-mono text-red-600 font-semibold text-right">{formatCurrency(month.pendingInterest)}</TableCell>
+                                <TableCell className="text-xs text-muted-foreground">{month.calculationNote || ''}</TableCell>
                               </TableRow>
                             ))}
                           </TableBody>

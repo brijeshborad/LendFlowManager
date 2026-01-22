@@ -116,7 +116,6 @@ export default function Loans() {
   const getLatestInterestClearedDate = (loanId: string) => {
     const loanPayments = payments.filter((p: any) => 
       p.loanId === loanId && 
-      (p.paymentType === 'interest' || p.paymentType === 'partial_interest') &&
       p.interestClearedTillDate
     );
     
@@ -174,6 +173,12 @@ export default function Loans() {
                 <Calendar className="h-4 w-4" />
                 <span>Started: {formatDate(selectedLoan.startDate)}</span>
               </div>
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-full">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm font-medium text-purple-700">
+                  Interest cleared till {getLatestInterestClearedDate(selectedLoan.id) ? formatDate(getLatestInterestClearedDate(selectedLoan.id)) : "-"}
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex gap-2">
@@ -188,140 +193,147 @@ export default function Loans() {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Principal Amount</h3>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">{formatCurrency(selectedLoan.principalAmount)}</p>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold">Interest Rate</h3>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-3xl font-bold">{selectedLoan.interestRate}% <span className="text-lg text-muted-foreground">{selectedLoan.interestRateType}</span></p>
-                </CardContent>
-              </Card>
-            </div>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-6 mb-6">
+          {/* Principal Balance */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Principal Balance</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Principal Amount</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {formatCurrency(selectedLoan.principalAmount)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Principal Paid</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(loanPayments
+                    .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Outstanding Principal</p>
+                <p className="text-xl font-bold text-orange-600">
+                  {formatCurrency(
+                    parseFloat(selectedLoan.principalAmount) -
+                    loanPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interest Summary */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Interest Summary</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Interest Earned</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(interestGenerated)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Interest Paid</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(interestPaid)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending Interest</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(pendingInterest)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Outstanding */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Total Outstanding</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Outstanding Principal</p>
+                <p className="text-lg font-semibold text-orange-600">
+                  {formatCurrency(
+                    parseFloat(selectedLoan.principalAmount) -
+                    loanPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending Interest</p>
+                <p className="text-lg font-semibold text-orange-600">{formatCurrency(pendingInterest)}</p>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-xs text-muted-foreground">Total Amount Due</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {formatCurrency(
+                    (parseFloat(selectedLoan.principalAmount) -
+                    loanPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)) +
+                    pendingInterest
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
             
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold">Payment History</h2>
-              </CardHeader>
-              <CardContent>
-                {loanPayments.length === 0 ? (
-                  <p className="text-muted-foreground">No payments yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {loanPayments.map((payment: any) => (
-                      <div key={payment.id} className="flex justify-between items-start p-4 border rounded-lg hover:bg-muted/50">
-                        <div className="space-y-1">
-                          <p className="text-xl font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
-                          <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
-                          {payment.interestClearedTillDate && (
-                            <p className="text-xs text-green-600 font-medium">Interest cleared till: {formatDate(payment.interestClearedTillDate)}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{formatDate(payment.paymentDate)}</p>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDeletePayment(payment)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
+        <div className="grid grid-cols-1 gap-6">
+          <Card>
+            <CardHeader>
+              <h2 className="text-xl font-semibold">Payment History</h2>
+            </CardHeader>
+            <CardContent>
+              {loanPayments.length === 0 ? (
+                <p className="text-muted-foreground">No payments yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {loanPayments.map((payment: any) => (
+                    <div key={payment.id} className="flex justify-between items-start p-4 border rounded-lg hover:bg-muted/50">
+                      <div className="space-y-1">
+                        <p className="text-xl font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
+                        <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-          
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <h3 className="font-semibold">Payment Summary</h3>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Interest Earned:</span>
-                  <span className="text-lg font-semibold text-blue-600">₹{interestGenerated.toLocaleString('en-IN')}</span>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <p className="text-sm font-medium">{formatDate(payment.paymentDate)}</p>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditPayment(payment)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeletePayment(payment)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total Paid:</span>
-                  <span className="text-lg font-semibold text-green-600">₹{totalPaid.toLocaleString('en-IN')}</span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Pending Interest:</span>
-                  <span className="text-lg font-semibold text-orange-600">₹{pendingInterest.toLocaleString('en-IN')}</span>
-                </div>
-                
-                <hr className="my-4" />
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Interest Cleared Till:</span>
-                  <span className="text-lg font-semibold text-green-600">
-                    {getLatestInterestClearedDate(selectedLoan.id) 
-                      ? formatDate(getLatestInterestClearedDate(selectedLoan.id))
-                      : "No payments yet"
-                    }
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <h3 className="font-semibold">Loan Status</h3>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Status:</span>
-                  <Badge variant={selectedLoan.status === 'active' ? 'default' : 'secondary'}>
-                    {selectedLoan.status}
-                  </Badge>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Total Payments:</span>
-                  <span className="font-medium">{loanPayments.length}</span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Days Active:</span>
-                  <span className="font-medium">
-                    {Math.floor((Date.now() - new Date(selectedLoan.startDate).getTime()) / (1000 * 60 * 60 * 24))} days
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
         
         <EditLoanModal 
@@ -329,7 +341,7 @@ export default function Loans() {
           onClose={() => setEditModalOpen(false)} 
           loan={selectedLoan || null}
         />
-        <AddPaymentModal 
+        <AddPaymentModal
           open={addPaymentModalOpen} 
           onClose={() => setAddPaymentModalOpen(false)} 
           preSelectedBorrowerId={selectedLoan.borrowerId}

@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { AddBorrowerModal } from "@/components/AddBorrowerModal";
+import { AddLoanModal } from "@/components/AddLoanModal";
 import { AddPaymentModal } from "@/components/AddPaymentModal";
 import { EditPaymentModal } from "@/components/EditPaymentModal";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,7 @@ import type { Borrower, Loan, Payment } from "@shared/schema";
 export default function Borrowers() {
   const { toast } = useToast();
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addLoanModalOpen, setAddLoanModalOpen] = useState(false);
   const [addPaymentModalOpen, setAddPaymentModalOpen] = useState(false);
   const [editPaymentModalOpen, setEditPaymentModalOpen] = useState(false);
   const [deletePaymentDialogOpen, setDeletePaymentDialogOpen] = useState(false);
@@ -148,6 +150,17 @@ export default function Borrowers() {
 
   const interestSummary = calculateTotalInterestSummary();
 
+  // Find the latest interest cleared till date
+  const getLatestInterestClearedDate = () => {
+    const paymentsWithInterestDate = borrowerPayments
+      .filter((p: any) => p.interestClearedTillDate)
+      .sort((a: any, b: any) => new Date(b.interestClearedTillDate).getTime() - new Date(a.interestClearedTillDate).getTime());
+    
+    return paymentsWithInterestDate.length > 0 ? paymentsWithInterestDate[0].interestClearedTillDate : null;
+  };
+
+  const latestInterestClearedDate = getLatestInterestClearedDate();
+
   if (selectedBorrower) {
     return (
       <div className="p-8 space-y-6">
@@ -159,34 +172,121 @@ export default function Borrowers() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-semibold">{selectedBorrower.name}</h1>
-            <p className="text-muted-foreground mt-1">{selectedBorrower.email} • {selectedBorrower.phone}</p>
+            <div className="flex items-center gap-4 mt-1">
+              <p className="text-muted-foreground">{selectedBorrower.email} • {selectedBorrower.phone}</p>
+              <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-full">
+                <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                <span className="text-sm font-medium text-purple-700">
+                  Interest cleared till {latestInterestClearedDate ? formatDate(latestInterestClearedDate) : "-"}
+                </span>
+              </div>
+            </div>
           </div>
-          <Button onClick={() => setAddPaymentModalOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Payment
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => setAddLoanModalOpen(true)} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Loan
+            </Button>
+            <Button onClick={() => setAddPaymentModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Payment
+            </Button>
+          </div>
         </div>
         
-        {/* Total Interest Summary */}
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold">Total Interest Summary</h2>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Interest Earned</p>
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(interestSummary.earned)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Interest Paid</p>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(interestSummary.paid)}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Pending Interest</p>
-              <p className="text-2xl font-bold text-orange-600">{formatCurrency(interestSummary.pending)}</p>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Summary Cards */}
+        <div className="grid grid-cols-3 gap-6">
+          {/* Outstanding Balance Breakdown */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Principal Balance</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Total Principal Lent</p>
+                <p className="text-xl font-bold text-blue-600">
+                  {formatCurrency(borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Principal Paid</p>
+                <p className="text-xl font-bold text-green-600">
+                  {formatCurrency(borrowerPayments
+                    .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0))}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Outstanding Principal</p>
+                <p className="text-xl font-bold text-orange-600">
+                  {formatCurrency(
+                    borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
+                    borrowerPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Interest Summary */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Interest Summary</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Interest Earned</p>
+                <p className="text-xl font-bold text-blue-600">{formatCurrency(interestSummary.earned)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Interest Paid</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(interestSummary.paid)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending Interest</p>
+                <p className="text-xl font-bold text-orange-600">{formatCurrency(interestSummary.pending)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Total Outstanding */}
+          <Card>
+            <CardHeader>
+              <h2 className="text-lg font-semibold">Total Outstanding</h2>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Outstanding Principal</p>
+                <p className="text-lg font-semibold text-orange-600">
+                  {formatCurrency(
+                    borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
+                    borrowerPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Pending Interest</p>
+                <p className="text-lg font-semibold text-orange-600">{formatCurrency(interestSummary.pending)}</p>
+              </div>
+              <div className="border-t pt-3">
+                <p className="text-xs text-muted-foreground">Total Amount Due</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {formatCurrency(
+                    (borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
+                    borrowerPayments
+                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)) +
+                    interestSummary.pending
+                  )}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         
         {/* Active Loans */}
         <Card>
@@ -201,6 +301,10 @@ export default function Borrowers() {
                 {activeLoans.map((loan: any) => {
                   const loanInterest = realTimeInterest.find((i: any) => i.loanId === loan.id);
                   const loanPayments = payments.filter((p: any) => p.loanId === loan.id);
+                  const principalPaid = loanPayments
+                    .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                    .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+                  const outstandingPrincipal = parseFloat(loan.principalAmount) - principalPaid;
                   const totalPaid = loanPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
                   
                   return (
@@ -217,6 +321,7 @@ export default function Borrowers() {
                               <TrendingUp className="h-3 w-3" />
                               <span>{loan.interestRate}% {loan.interestRateType}</span>
                             </div>
+                            <span>Outstanding: {formatCurrency(outstandingPrincipal)}</span>
                             <span>Started: {formatDate(loan.startDate)}</span>
                           </div>
                         </div>
@@ -251,13 +356,7 @@ export default function Borrowers() {
                         <p className="font-semibold">{formatCurrency(payment.amount)}</p>
                         <p className="text-sm text-muted-foreground">
                           {payment.paymentType} • {payment.paymentMethod}
-                          {loan && ` • Loan: ${formatCurrency(loan.principalAmount)}`}
                         </p>
-                        {payment.interestClearedTillDate && (
-                          <p className="text-xs text-purple-600 mt-1">
-                            Interest cleared till: {formatDate(payment.interestClearedTillDate)}
-                          </p>
-                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted-foreground">{formatDate(payment.paymentDate)}</p>
@@ -290,6 +389,11 @@ export default function Borrowers() {
           </CardContent>
         </Card>
         
+        <AddLoanModal 
+          open={addLoanModalOpen} 
+          onClose={() => setAddLoanModalOpen(false)} 
+          preSelectedBorrowerId={selectedBorrowerId}
+        />
         <AddPaymentModal 
           open={addPaymentModalOpen} 
           onClose={() => setAddPaymentModalOpen(false)} 
