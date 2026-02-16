@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AddLoanModal } from "@/components/AddLoanModal";
 import { EditLoanModal } from "@/components/EditLoanModal";
 import { AddPaymentModal } from "@/components/AddPaymentModal";
@@ -38,6 +39,8 @@ export default function Loans() {
   const [editPaymentModalOpen, setEditPaymentModalOpen] = useState(false);
   const [deletePaymentDialogOpen, setDeletePaymentDialogOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [deleteLoanDialogOpen, setDeleteLoanDialogOpen] = useState(false);
+  const [selectedLoanForDelete, setSelectedLoanForDelete] = useState<Loan | null>(null);
   const [, setLocation] = useLocation();
   const [selectedLoanId, setSelectedLoanId] = useState<string | null>(null);
 
@@ -80,6 +83,43 @@ export default function Loans() {
       });
     },
   });
+
+  const deleteLoanMutation = useMutation({
+    mutationFn: async (loanId: string) => {
+      await apiRequest("DELETE", `/api/loans/${loanId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Loan deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      setDeleteLoanDialogOpen(false);
+      setSelectedLoanForDelete(null);
+      setSelectedLoanId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete loan",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteLoan = (loan: Loan, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedLoanForDelete(loan);
+    setDeleteLoanDialogOpen(true);
+  };
+
+  const confirmDeleteLoan = () => {
+    if (selectedLoanForDelete) {
+      deleteLoanMutation.mutate(selectedLoanForDelete.id);
+    }
+  };
 
   const handleEditPayment = (payment: Payment) => {
     setSelectedPayment(payment);
@@ -189,6 +229,10 @@ export default function Loans() {
             <Button onClick={() => setEditModalOpen(true)} variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Edit Loan
+            </Button>
+            <Button onClick={() => handleDeleteLoan(selectedLoan)} variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Loan
             </Button>
           </div>
         </div>
@@ -362,8 +406,27 @@ export default function Loans() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
+              <AlertDialogAction
                 onClick={confirmDeletePayment}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog open={deleteLoanDialogOpen} onOpenChange={setDeleteLoanDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Loan</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete the loan of {selectedLoanForDelete && formatCurrency(selectedLoanForDelete.principalAmount)} for {selectedLoanForDelete && getBorrowerName(selectedLoanForDelete.borrowerId)}? This will also delete all associated payments. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteLoan}
                 className="bg-red-600 hover:bg-red-700"
               >
                 Delete
@@ -436,8 +499,25 @@ export default function Loans() {
                       {loan.status}
                     </Badge>
                   </div>
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Wallet className="h-5 w-5 text-primary" />
+                  <div className="flex items-center gap-1">
+                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <Wallet className="h-5 w-5 text-primary" />
+                    </div>
+                    <TooltipProvider delayDuration={0}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-red-600"
+                            onClick={(e) => handleDeleteLoan(loan, e)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete Loan</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               </CardHeader>
@@ -496,6 +576,25 @@ export default function Loans() {
       )}
 
       <AddLoanModal open={addModalOpen} onClose={() => setAddModalOpen(false)} />
+      <AlertDialog open={deleteLoanDialogOpen} onOpenChange={setDeleteLoanDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Loan</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the loan of {selectedLoanForDelete && formatCurrency(selectedLoanForDelete.principalAmount)} for {selectedLoanForDelete && getBorrowerName(selectedLoanForDelete.borrowerId)}? This will also delete all associated payments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteLoan}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
