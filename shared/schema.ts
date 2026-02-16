@@ -169,7 +169,8 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
   createdAt: true,
   updatedAt: true,
 }).extend({
-    paymentDate: z.coerce.date(), // <-- add this
+    paymentDate: z.coerce.date(),
+    interestClearedTillDate: z.coerce.date().nullable().optional(),
 });
 
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
