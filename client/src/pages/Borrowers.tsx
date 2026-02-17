@@ -413,6 +413,9 @@ export default function Borrowers() {
                         <p className="text-sm text-muted-foreground">
                           {payment.paymentType} • {payment.paymentMethod}
                         </p>
+                        {payment.interestClearedTillDate && (
+                          <p className="text-xs text-muted-foreground">Interest cleared till {formatDate(payment.interestClearedTillDate)}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted-foreground">{formatDate(payment.paymentDate)}</p>

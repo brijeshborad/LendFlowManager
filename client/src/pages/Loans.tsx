@@ -346,6 +346,9 @@ export default function Loans() {
                       <div className="space-y-1">
                         <p className="text-xl font-semibold">₹{parseFloat(payment.amount).toLocaleString('en-IN')}</p>
                         <p className="text-sm text-muted-foreground">{payment.paymentType} • {payment.paymentMethod}</p>
+                        {payment.interestClearedTillDate && (
+                          <p className="text-xs text-muted-foreground">Interest cleared till {formatDate(payment.interestClearedTillDate)}</p>
+                        )}
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">

@@ -469,6 +469,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
             const userId = (req.user as User).id;
             const validated = insertPaymentSchema.parse({...req.body, userId});
+
+            // Validate interestClearedTillDate is not older than the latest existing one
+            if (validated.interestClearedTillDate) {
+                const latestDate = await storage.getLatestInterestClearedTillDate(validated.loanId);
+                if (latestDate && new Date(validated.interestClearedTillDate) < latestDate) {
+                    const formatted = latestDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                    return res.status(400).json({
+                        message: `Interest cleared till date cannot be older than the previously recorded date (${formatted})`
+                    });
+                }
+            }
+
             const payment = await storage.createPayment(validated);
 
             await storage.createAuditLog({
@@ -507,6 +519,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ...(req.body.paymentDate && { paymentDate: new Date(req.body.paymentDate) }),
                 ...(req.body.interestClearedTillDate && { interestClearedTillDate: new Date(req.body.interestClearedTillDate) })
             };
+
             const payment = await storage.updatePayment(req.params.id, userId, updateData);
 
             await storage.createAuditLog({

@@ -58,7 +58,22 @@ export function AddPaymentModal({
         queryKey: ['/api/loans'],
         enabled: open,
     });
-    
+
+    // Fetch payments to determine latest interestClearedTillDate for selected loan
+    const {data: allPayments = []} = useQuery<any[]>({
+        queryKey: ['/api/payments'],
+        enabled: open && !!loanId,
+    });
+
+    const minInterestClearedTillDate = loanId
+        ? allPayments
+            .filter((p: any) => p.loanId === loanId && p.interestClearedTillDate)
+            .reduce((latest: string | null, p: any) => {
+                const d = new Date(p.interestClearedTillDate).toISOString().split('T')[0];
+                return !latest || d > latest ? d : latest;
+            }, null)
+        : null;
+
     // Reset loan when borrower changes (only if no pre-selected loan)
     useEffect(() => {
         if (borrowerId) {
@@ -247,10 +262,13 @@ export function AddPaymentModal({
                                     name="interest-cleared-till"
                                     type="date"
                                     required
+                                    min={minInterestClearedTillDate || undefined}
                                     data-testid="input-interest-cleared-till"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    Specify till which date the interest is cleared with this payment
+                                    {minInterestClearedTillDate
+                                        ? `Date must be on or after ${new Date(minInterestClearedTillDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                        : 'Specify till which date the interest is cleared with this payment'}
                                 </p>
                             </div>
                         )}

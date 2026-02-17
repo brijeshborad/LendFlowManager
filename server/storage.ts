@@ -25,7 +25,7 @@ import {
   type InsertAuditLog,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, gte, lte, sql } from "drizzle-orm";
+import { eq, and, ne, desc, gte, lte, sql, isNotNull } from "drizzle-orm";
 import { calculateRealTimeInterestForUser } from "./interestCalculationService";
 
 // Interface for storage operations
@@ -57,6 +57,7 @@ export interface IStorage {
   createPayment(payment: InsertPayment): Promise<Payment>;
   updatePayment(id: string, userId: string, payment: Partial<InsertPayment>): Promise<Payment>;
   deletePayment(id: string, userId: string): Promise<void>;
+  getLatestInterestClearedTillDate(loanId: string, excludePaymentId?: string): Promise<Date | null>;
 
   // Reminder operations
   getReminders(userId: string, borrowerId?: string): Promise<Reminder[]>;
@@ -265,6 +266,21 @@ export class DatabaseStorage implements IStorage {
 
   async deletePayment(id: string, userId: string): Promise<void> {
     await db.delete(payments).where(and(eq(payments.id, id), eq(payments.userId, userId)));
+  }
+
+  async getLatestInterestClearedTillDate(loanId: string, excludePaymentId?: string): Promise<Date | null> {
+    const conditions = [
+      eq(payments.loanId, loanId),
+      isNotNull(payments.interestClearedTillDate),
+    ];
+    if (excludePaymentId) {
+      conditions.push(ne(payments.id, excludePaymentId));
+    }
+    const [result] = await db
+      .select({ maxDate: sql<string>`MAX(${payments.interestClearedTillDate})` })
+      .from(payments)
+      .where(and(...conditions));
+    return result?.maxDate ? new Date(result.maxDate) : null;
   }
 
   // Reminder operations
