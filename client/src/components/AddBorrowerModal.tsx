@@ -107,10 +107,10 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="borrower-name">Full Name *</Label>
+          <div className="grid gap-3.5 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="borrower-name" className="text-xs font-medium">Full Name *</Label>
                 <Input
                   id="borrower-name"
                   placeholder="Rajesh Kumar"
@@ -121,8 +121,8 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                   disabled={createBorrowerMutation.isPending}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="email" className="text-xs font-medium">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -136,9 +136,9 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="phone" className="text-xs font-medium">Phone Number *</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -150,8 +150,8 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
                   disabled={createBorrowerMutation.isPending}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact-method">Preferred Contact Method</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="contact-method" className="text-xs font-medium">Preferred Contact Method</Label>
                 <Select 
                   value={contactMethod} 
                   onValueChange={setContactMethod}
@@ -169,8 +169,8 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="address">Address (Optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="address" className="text-xs font-medium">Address (Optional)</Label>
               <Input
                 id="address"
                 placeholder="123 Main St, City, State"
@@ -181,8 +181,8 @@ export function AddBorrowerModal({ open, onClose }: AddBorrowerModalProps) {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="borrower-notes">Notes (Optional)</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="borrower-notes" className="text-xs font-medium">Notes (Optional)</Label>
               <Textarea
                 id="borrower-notes"
                 placeholder="Additional information about the borrower..."

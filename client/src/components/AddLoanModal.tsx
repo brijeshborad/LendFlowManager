@@ -124,9 +124,9 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-6 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="borrower">Select Borrower *</Label>
+          <div className="grid gap-3.5 py-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="borrower" className="text-xs font-medium">Select Borrower *</Label>
               <Select 
                 value={borrowerId} 
                 onValueChange={setBorrowerId}
@@ -150,9 +150,9 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="principal">Principal Amount (₹) *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="principal" className="text-xs font-medium">Principal Amount (₹) *</Label>
                 <Input
                   id="principal"
                   type="number"
@@ -160,14 +160,15 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
                   required
                   min="1"
                   step="0.01"
+                  className="font-mono"
                   value={principalAmount}
                   onChange={(e) => setPrincipalAmount(e.target.value)}
                   data-testid="input-principal-amount"
                   disabled={createLoanMutation.isPending}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="interest-rate">Interest Rate (%) *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="interest-rate" className="text-xs font-medium">Interest Rate (%) *</Label>
                 <Input
                   id="interest-rate"
                   type="number"
@@ -176,6 +177,7 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
                   min="0"
                   max="100"
                   step="0.01"
+                  className="font-mono"
                   value={interestRate}
                   onChange={(e) => setInterestRate(e.target.value)}
                   data-testid="input-interest-rate"
@@ -184,9 +186,9 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="interest-rate-type">Interest Rate Type *</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="interest-rate-type" className="text-xs font-medium">Interest Rate Type *</Label>
                 <Select 
                   value={interestRateType} 
                   onValueChange={setInterestRateType}
@@ -201,8 +203,8 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="start-date">Start Date *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="start-date" className="text-xs font-medium">Start Date *</Label>
                 <Input
                   id="start-date"
                   type="date"

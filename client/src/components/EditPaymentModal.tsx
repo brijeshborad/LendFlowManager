@@ -111,33 +111,36 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-amount">Amount (₹) *</Label>
-              <Input
-                id="edit-amount"
-                type="number"
-                required
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={updatePaymentMutation.isPending}
-              />
+          <div className="grid gap-3.5 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-amount" className="text-xs font-medium">Amount (₹) *</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  required
+                  className="font-mono"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={updatePaymentMutation.isPending}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-payment-date" className="text-xs font-medium">Payment Date *</Label>
+                <Input
+                  id="edit-payment-date"
+                  type="date"
+                  required
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  disabled={updatePaymentMutation.isPending}
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-payment-date">Payment Date *</Label>
-              <Input
-                id="edit-payment-date"
-                type="date"
-                required
-                value={paymentDate}
-                onChange={(e) => setPaymentDate(e.target.value)}
-                disabled={updatePaymentMutation.isPending}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-payment-type">Payment Type *</Label>
+            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-payment-type" className="text-xs font-medium">Payment Type *</Label>
               <Select 
                 value={paymentType} 
                 onValueChange={setPaymentType}
@@ -155,8 +158,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-payment-method">Payment Method *</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-payment-method" className="text-xs font-medium">Payment Method *</Label>
               <Select 
                 value={paymentMethod} 
                 onValueChange={setPaymentMethod}
@@ -173,9 +176,10 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
                 </SelectContent>
               </Select>
             </div>
+            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-reference">Transaction Reference</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-reference" className="text-xs font-medium">Transaction Reference</Label>
               <Input
                 id="edit-reference"
                 value={transactionReference}
@@ -185,8 +189,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
             </div>
 
             {(paymentType === 'interest' || paymentType === 'partial_interest') && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-interest-cleared-till">Interest Cleared Till Date *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-interest-cleared-till" className="text-xs font-medium">Interest Cleared Till Date *</Label>
                 <Input
                   id="edit-interest-cleared-till"
                   type="date"
@@ -198,8 +202,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-notes">Notes</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-notes" className="text-xs font-medium">Notes</Label>
               <Textarea
                 id="edit-notes"
                 value={notes}

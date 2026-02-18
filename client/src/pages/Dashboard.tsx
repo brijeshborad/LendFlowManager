@@ -339,108 +339,89 @@ export default function Dashboard() {
       </div>
 
       {statsLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
-            <Skeleton key={i} className="h-32" data-testid={`skeleton-card-${i}`} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <Skeleton key={i} className="h-28" data-testid={`skeleton-card-${i}`} />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-          <SummaryCard
-            title="Total Amount Lent"
-            value={formatCurrency(stats?.totalLent || 0) || "₹0"}
-            subValue="All time"
-            icon={LucideIndianRupee}
-            iconColor="bg-blue-500"
-            data-testid="card-total-lent"
-          />
-          <SummaryCard
-            title="Outstanding Principal"
-            value={stats?.totalOutstanding || "₹0"}
-            icon={Banknote}
-            iconColor="bg-orange-500"
-            data-testid="card-outstanding"
-          />
-          <SummaryCard
-            title="Total Paid Interest"
-            value={formatCurrency(payments
-              .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-              .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
-            subValue="Collected"
-            icon={TrendingUp}
-            iconColor="bg-emerald-500"
-            data-testid="card-paid-interest"
-          />
-          <SummaryCard
-            title="Pending Interest"
-            value={stats?.totalPendingInterest || "₹0"}
-            icon={TrendingUp}
-            iconColor="bg-red-500"
-            data-testid="card-pending-interest"
-          />
-          <SummaryCard
-            title="Active Borrowers"
-            value={String(stats?.activeBorrowers || 0)}
-            subValue={`${borrowers.length} total`}
-            icon={Users}
-            iconColor="bg-purple-500"
-            data-testid="card-active-borrowers"
-          />
-          <SummaryCard
-            title="Daily Interest Earning"
-            value={formatCurrency(additionalMetrics.dailyInterest)}
-            subValue="Per day"
-            icon={TrendingUp}
-            iconColor="bg-green-500"
-            data-testid="card-daily-interest"
-          />
-          <SummaryCard
-            title="Monthly Interest Earning"
-            value={formatCurrency(additionalMetrics.monthlyInterest)}
-            subValue="Per month"
-            icon={TrendingUp}
-            iconColor="bg-teal-500"
-            data-testid="card-monthly-interest"
-          />
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Average Loan Size</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono" data-testid="text-avg-loan-size">
-                ₹{additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Across {loans.length} loans
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Average Interest Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono" data-testid="text-avg-interest-rate">
-                {additionalMetrics.avgInterestRate.toFixed(2)}%
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Per month
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Interest Earned</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold font-mono text-green-600" data-testid="text-total-interest-earned">
-                ₹{additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Real-time calculation
-              </p>
-            </CardContent>
-          </Card>
+        <div className="space-y-4">
+          {/* Primary metrics */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SummaryCard
+              title="Total Amount Lent"
+              value={formatCurrency(stats?.totalLent || 0) || "₹0"}
+              subValue="All time"
+              icon={LucideIndianRupee}
+              iconColor="bg-blue-500"
+            />
+            <SummaryCard
+              title="Outstanding Principal"
+              value={stats?.totalOutstanding || "₹0"}
+              icon={Banknote}
+              iconColor="bg-orange-500"
+            />
+            <SummaryCard
+              title="Interest Collected"
+              value={formatCurrency(payments
+                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
+              icon={TrendingUp}
+              iconColor="bg-emerald-500"
+            />
+            <SummaryCard
+              title="Pending Interest"
+              value={stats?.totalPendingInterest || "₹0"}
+              icon={TrendingUp}
+              iconColor="bg-red-500"
+            />
+          </div>
+
+          {/* Secondary metrics */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <SummaryCard
+              title="Active Borrowers"
+              value={String(stats?.activeBorrowers || 0)}
+              subValue={`${borrowers.length} total`}
+              icon={Users}
+              iconColor="bg-purple-500"
+            />
+            <SummaryCard
+              title="Daily Earning"
+              value={formatCurrency(additionalMetrics.dailyInterest)}
+              subValue="Per day"
+              icon={TrendingUp}
+              iconColor="bg-green-500"
+            />
+            <SummaryCard
+              title="Monthly Earning"
+              value={formatCurrency(additionalMetrics.monthlyInterest)}
+              subValue="Per month"
+              icon={TrendingUp}
+              iconColor="bg-teal-500"
+            />
+            <SummaryCard
+              title="Avg Loan Size"
+              value={`₹${additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              subValue={`${loans.length} loans`}
+              icon={Banknote}
+              iconColor="bg-slate-500"
+            />
+            <SummaryCard
+              title="Avg Interest Rate"
+              value={`${additionalMetrics.avgInterestRate.toFixed(2)}%`}
+              subValue="Per month"
+              icon={TrendingUp}
+              iconColor="bg-indigo-500"
+            />
+            <SummaryCard
+              title="Total Interest Earned"
+              value={`₹${additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+              subValue="Real-time"
+              icon={TrendingUp}
+              iconColor="bg-emerald-600"
+            />
+          </div>
         </div>
       )}
 
@@ -593,7 +574,7 @@ export default function Dashboard() {
 
               {['all', 'active', 'overdue', 'settled'].map((tab) => (
                 <TabsContent key={tab} value={tab} className="mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                     {borrowers
                       .filter((b) => tab === 'all' || b.status === tab)
                       .map((borrower, index) => {

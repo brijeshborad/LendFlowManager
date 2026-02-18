@@ -22,20 +22,20 @@ export function SummaryCard({
   iconColor = "bg-primary",
 }: SummaryCardProps) {
   return (
-    <Card data-testid={`card-summary-${title.toLowerCase().replace(/\s+/g, '-')}`}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className="text-3xl font-bold font-mono tracking-tight mt-2">{value}</p>
+    <Card className="overflow-hidden" data-testid={`card-summary-${title.toLowerCase().replace(/\s+/g, '-')}`}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+            <p className="text-2xl font-bold font-mono tracking-tight mt-1.5 truncate">{value}</p>
             {subValue && (
-              <p className="text-sm text-muted-foreground mt-1">{subValue}</p>
+              <p className="text-xs text-muted-foreground mt-1">{subValue}</p>
             )}
             {trendValue && (
-              <div className="flex items-center gap-1 mt-2">
+              <div className="flex items-center gap-1 mt-1.5">
                 <span
                   className={cn(
-                    "text-sm font-medium",
+                    "text-xs font-semibold",
                     trend === "up" ? "text-green-600" : "text-red-600"
                   )}
                 >
@@ -45,8 +45,8 @@ export function SummaryCard({
               </div>
             )}
           </div>
-          <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", iconColor)}>
-            <Icon className="h-5 w-5 text-white" />
+          <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", iconColor)}>
+            <Icon className="h-4.5 w-4.5 text-white" />
           </div>
         </div>
       </CardContent>

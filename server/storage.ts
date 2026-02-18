@@ -84,11 +84,9 @@ export interface IStorage {
   // Analytics operations
   getDashboardStats(userId: string): Promise<{
     totalLent: string;
-    outstandingPrincipal: string;
-    interestReceived: string;
-    interestPending: string;
+    totalOutstanding: string;
+    totalPendingInterest: string;
     activeBorrowers: number;
-    activeLoans: number;
   }>;
 }
 
@@ -407,53 +405,38 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  // Analytics operations with optimized single query
+  // Analytics operations - optimized to 2 queries + interest calculation
   async getDashboardStats(userId: string): Promise<{
     totalLent: string;
     totalOutstanding: string;
     totalPendingInterest: string;
     activeBorrowers: number;
   }> {
-    // Get total lent from loans table separately to avoid JOIN duplication
-    const loanStats = await db
-      .select({
+    // Single query for loan stats + active borrowers count
+    const [combinedStats, realTimeInterest] = await Promise.all([
+      db.select({
         totalLent: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
-      })
-      .from(loans)
-      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
-      .where(eq(borrowers.userId, userId));
-
-    // Get payment stats
-    const paymentStats = await db
-      .select({
+        activeBorrowers: sql<number>`COUNT(DISTINCT CASE WHEN ${borrowers.status} = 'active' THEN ${borrowers.id} END)`,
         principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
       })
-      .from(payments)
-      .innerJoin(loans, eq(payments.loanId, loans.id))
+      .from(loans)
       .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
-      .where(eq(borrowers.userId, userId));
+      .leftJoin(payments, eq(loans.id, payments.loanId))
+      .where(eq(loans.userId, userId)),
+      calculateRealTimeInterestForUser(userId),
+    ]);
 
-    // Get active borrowers count
-    const borrowerStats = await db
-      .select({
-        activeBorrowers: sql<number>`COUNT(DISTINCT ${borrowers.id})`,
-      })
-      .from(borrowers)
-      .where(and(eq(borrowers.userId, userId), eq(borrowers.status, 'active')));
-    
-    // Get real-time interest data
-    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
     const totalInterestGenerated = realTimeInterest.reduce((sum, entry) => sum + entry.totalInterest, 0);
 
-    const totalLent = loanStats[0]?.totalLent || 0;
-    const principalPaid = paymentStats[0]?.principalPaid || 0;
-    const interestPaid = paymentStats[0]?.interestPaid || 0;
-    const activeBorrowers = borrowerStats[0]?.activeBorrowers || 0;
-    
+    const totalLent = combinedStats[0]?.totalLent || 0;
+    const principalPaid = combinedStats[0]?.principalPaid || 0;
+    const interestPaid = combinedStats[0]?.interestPaid || 0;
+    const activeBorrowers = combinedStats[0]?.activeBorrowers || 0;
+
     const outstandingPrincipal = totalLent - principalPaid;
     const interestPending = totalInterestGenerated - interestPaid;
-    
+
     return {
       totalLent: `₹${totalLent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       totalOutstanding: `₹${outstandingPrincipal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,

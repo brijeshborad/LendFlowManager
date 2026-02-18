@@ -154,10 +154,10 @@ export function AddPaymentModal({
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit}>
-                    <div className="grid gap-6 py-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="borrower">Borrower</Label>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="borrower" className="text-xs font-medium">Borrower</Label>
                                 <Select value={borrowerId} onValueChange={setBorrowerId} required>
                                     <SelectTrigger id="borrower" data-testid="select-borrower">
                                         <SelectValue placeholder="Select borrower"/>
@@ -171,8 +171,8 @@ export function AddPaymentModal({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="loan">Loan</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="loan" className="text-xs font-medium">Loan</Label>
                                 <Select value={loanId} onValueChange={setLoanId} required>
                                     <SelectTrigger id="loan" data-testid="select-loan">
                                         <SelectValue placeholder="Select loan"/>
@@ -188,9 +188,9 @@ export function AddPaymentModal({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="payment-date">Payment Date</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="payment-date" className="text-xs font-medium">Payment Date</Label>
                                 <Input
                                     id="payment-date"
                                     name="payment-date"
@@ -199,8 +199,8 @@ export function AddPaymentModal({
                                     data-testid="input-payment-date"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="amount">Amount (₹)</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="amount" className="text-xs font-medium">Amount (₹)</Label>
                                 <Input
                                     id="amount"
                                     name="amount"
@@ -213,9 +213,9 @@ export function AddPaymentModal({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="payment-type">Payment Type</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="payment-type" className="text-xs font-medium">Payment Type</Label>
                                 <Select value={paymentType} onValueChange={setPaymentType} required>
                                     <SelectTrigger id="payment-type" data-testid="select-payment-type">
                                         <SelectValue placeholder="Select type"/>
@@ -228,8 +228,8 @@ export function AddPaymentModal({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="payment-method">Payment Method</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="payment-method" className="text-xs font-medium">Payment Method</Label>
                                 <Select value={paymentMethod} onValueChange={setPaymentMethod} required>
                                     <SelectTrigger id="payment-method" data-testid="select-payment-method">
                                         <SelectValue placeholder="Select method"/>
@@ -244,8 +244,8 @@ export function AddPaymentModal({
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="reference">Transaction Reference (Optional)</Label>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="reference" className="text-xs font-medium">Transaction Reference (Optional)</Label>
                             <Input
                                 id="reference"
                                 name="reference"
@@ -255,8 +255,8 @@ export function AddPaymentModal({
                         </div>
 
                         {(paymentType === 'interest' || paymentType === 'partial-interest') && (
-                            <div className="space-y-2">
-                                <Label htmlFor="interest-cleared-till">Interest Cleared Till Date *</Label>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="interest-cleared-till" className="text-xs font-medium">Interest Cleared Till Date *</Label>
                                 <Input
                                     id="interest-cleared-till"
                                     name="interest-cleared-till"
@@ -273,8 +273,8 @@ export function AddPaymentModal({
                             </div>
                         )}
 
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">Notes (Optional)</Label>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="notes" className="text-xs font-medium">Notes (Optional)</Label>
                             <Textarea
                                 id="notes"
                                 name="notes"
@@ -284,15 +284,15 @@ export function AddPaymentModal({
                             />
                         </div>
 
-                        <div className="space-y-2">
-                            <Label>Upload Receipt (Optional)</Label>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium">Upload Receipt (Optional)</Label>
                             <div
-                                className="border-2 border-dashed rounded-md p-6 text-center hover-elevate cursor-pointer">
-                                <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2"/>
-                                <p className="text-sm text-muted-foreground">
+                                className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/40 transition-colors cursor-pointer">
+                                <Upload className="h-6 w-6 mx-auto text-muted-foreground mb-1.5"/>
+                                <p className="text-xs text-muted-foreground">
                                     Click to upload or drag and drop
                                 </p>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-[10px] text-muted-foreground mt-0.5">
                                     PNG, JPG or PDF up to 10MB
                                 </p>
                             </div>

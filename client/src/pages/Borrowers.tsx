@@ -234,30 +234,30 @@ export default function Borrowers() {
         </div>
         
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-6">
-          {/* Outstanding Balance Breakdown */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Principal Balance */}
           <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Principal Balance</h2>
+            <CardHeader className="pb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Principal Balance</h2>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
+            <CardContent className="space-y-2.5">
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Total Principal Lent</p>
-                <p className="text-xl font-bold text-blue-600">
+                <p className="text-lg font-bold font-mono text-blue-600">
                   {formatCurrency(borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0))}
                 </p>
               </div>
-              <div>
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Principal Paid</p>
-                <p className="text-xl font-bold text-green-600">
+                <p className="text-lg font-bold font-mono text-green-600">
                   {formatCurrency(borrowerPayments
                     .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
                     .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0))}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Outstanding Principal</p>
-                <p className="text-xl font-bold text-orange-600">
+              <div className="flex justify-between items-baseline border-t pt-2.5">
+                <p className="text-xs font-medium text-muted-foreground">Outstanding</p>
+                <p className="text-lg font-bold font-mono text-orange-600">
                   {formatCurrency(
                     borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
                     borrowerPayments
@@ -271,34 +271,34 @@ export default function Borrowers() {
 
           {/* Interest Summary */}
           <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Interest Summary</h2>
+            <CardHeader className="pb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Interest Summary</h2>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
+            <CardContent className="space-y-2.5">
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Interest Earned</p>
-                <p className="text-xl font-bold text-blue-600">{formatCurrency(interestSummary.earned)}</p>
+                <p className="text-lg font-bold font-mono text-blue-600">{formatCurrency(interestSummary.earned)}</p>
               </div>
-              <div>
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Interest Paid</p>
-                <p className="text-xl font-bold text-green-600">{formatCurrency(interestSummary.paid)}</p>
+                <p className="text-lg font-bold font-mono text-green-600">{formatCurrency(interestSummary.paid)}</p>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pending Interest</p>
-                <p className="text-xl font-bold text-orange-600">{formatCurrency(interestSummary.pending)}</p>
+              <div className="flex justify-between items-baseline border-t pt-2.5">
+                <p className="text-xs font-medium text-muted-foreground">Pending</p>
+                <p className="text-lg font-bold font-mono text-orange-600">{formatCurrency(interestSummary.pending)}</p>
               </div>
             </CardContent>
           </Card>
 
           {/* Total Outstanding */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold">Total Outstanding</h2>
+          <Card className="bg-muted/30">
+            <CardHeader className="pb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Total Outstanding</h2>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div>
+            <CardContent className="space-y-2.5">
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Outstanding Principal</p>
-                <p className="text-lg font-semibold text-orange-600">
+                <p className="font-semibold font-mono text-orange-600">
                   {formatCurrency(
                     borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
                     borrowerPayments
@@ -307,21 +307,23 @@ export default function Borrowers() {
                   )}
                 </p>
               </div>
-              <div>
+              <div className="flex justify-between items-baseline">
                 <p className="text-xs text-muted-foreground">Pending Interest</p>
-                <p className="text-lg font-semibold text-orange-600">{formatCurrency(interestSummary.pending)}</p>
+                <p className="font-semibold font-mono text-orange-600">{formatCurrency(interestSummary.pending)}</p>
               </div>
-              <div className="border-t pt-3">
-                <p className="text-xs text-muted-foreground">Total Amount Due</p>
-                <p className="text-2xl font-bold text-red-600">
-                  {formatCurrency(
-                    (borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
-                    borrowerPayments
-                      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
-                      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)) +
-                    interestSummary.pending
-                  )}
-                </p>
+              <div className="border-t pt-2.5">
+                <div className="flex justify-between items-baseline">
+                  <p className="text-xs font-semibold text-muted-foreground">Total Amount Due</p>
+                  <p className="text-xl font-bold font-mono text-red-600">
+                    {formatCurrency(
+                      (borrowerLoans.reduce((sum: number, loan: any) => sum + parseFloat(loan.principalAmount), 0) -
+                      borrowerPayments
+                        .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                        .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0)) +
+                      interestSummary.pending
+                    )}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -405,23 +407,34 @@ export default function Borrowers() {
             ) : (
               <div className="space-y-2">
                 {borrowerPayments.map((payment: any) => {
-                  const loan = loans.find((l: any) => l.id === payment.loanId);
                   return (
-                    <div key={payment.id} className="flex justify-between items-center p-3 border rounded">
-                      <div>
-                        <p className="font-semibold">{formatCurrency(payment.amount)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {payment.paymentType} • {payment.paymentMethod}
-                        </p>
-                        {payment.interestClearedTillDate && (
-                          <p className="text-xs text-muted-foreground">Interest cleared till {formatDate(payment.interestClearedTillDate)}</p>
-                        )}
+                    <div key={payment.id} className="flex justify-between items-center p-3.5 border rounded-lg hover:bg-muted/40 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          payment.paymentType === 'principal' ? 'bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400' :
+                          payment.paymentType === 'interest' ? 'bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400' :
+                          payment.paymentType === 'partial_interest' ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400' :
+                          'bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400'
+                        }`}>
+                          <TrendingUp className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold font-mono">{formatCurrency(payment.amount)}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className="text-xs text-muted-foreground capitalize">{payment.paymentType.replace('_', ' ')}</span>
+                            <span className="text-xs text-muted-foreground">•</span>
+                            <span className="text-xs text-muted-foreground capitalize">{payment.paymentMethod.replace('_', ' ')}</span>
+                          </div>
+                          {payment.interestClearedTillDate && (
+                            <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-0.5">Cleared till {formatDate(payment.interestClearedTillDate)}</p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <p className="text-sm text-muted-foreground">{formatDate(payment.paymentDate)}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(payment.paymentDate)}</p>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
+                            <Button variant="ghost" size="icon" className="h-7 w-7">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -430,7 +443,7 @@ export default function Borrowers() {
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDeletePayment(payment)}
                               className="text-red-600"
                             >
@@ -541,26 +554,26 @@ export default function Borrowers() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {borrowers.map((borrower) => (
-            <Card key={borrower.id} className="hover-elevate cursor-pointer" onClick={() => setSelectedBorrowerId(borrower.id)} data-testid={`card-borrower-${borrower.id}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-primary font-semibold text-sm">
-                        {borrower.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                      </span>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold" data-testid={`text-borrower-name-${borrower.id}`}>
+            <Card key={borrower.id} className="hover-elevate cursor-pointer overflow-hidden" onClick={() => setSelectedBorrowerId(borrower.id)} data-testid={`card-borrower-${borrower.id}`}>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <span className="text-primary font-semibold text-sm">
+                      {borrower.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-semibold truncate" data-testid={`text-borrower-name-${borrower.id}`}>
                         {borrower.name}
                       </h3>
-                      <Badge 
+                      <Badge
                         variant={
-                          borrower.status === 'active' ? 'default' : 
-                          borrower.status === 'overdue' ? 'destructive' : 
+                          borrower.status === 'active' ? 'default' :
+                          borrower.status === 'overdue' ? 'destructive' :
                           'secondary'
                         }
-                        className="text-xs mt-1"
+                        className="text-[10px] h-5 shrink-0"
                         data-testid={`badge-status-${borrower.id}`}
                       >
                         {borrower.status}
@@ -568,24 +581,24 @@ export default function Borrowers() {
                     </div>
                   </div>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  <span data-testid={`text-email-${borrower.id}`}>{borrower.email}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span data-testid={`text-phone-${borrower.id}`}>{borrower.phone}</span>
-                </div>
-                {borrower.address && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span className="line-clamp-1" data-testid={`text-address-${borrower.id}`}>
-                      {borrower.address}
-                    </span>
+                <div className="space-y-1.5 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate" data-testid={`text-email-${borrower.id}`}>{borrower.email}</span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-3.5 w-3.5 shrink-0" />
+                    <span data-testid={`text-phone-${borrower.id}`}>{borrower.phone}</span>
+                  </div>
+                  {borrower.address && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-3.5 w-3.5 shrink-0" />
+                      <span className="line-clamp-1" data-testid={`text-address-${borrower.id}`}>
+                        {borrower.address}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}

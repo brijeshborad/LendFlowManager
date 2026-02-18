@@ -240,6 +240,20 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+
+  /* Smooth transitions for all interactive elements */
+  button, a, [role="button"] {
+    @apply transition-colors duration-150;
+  }
+
+  /* Card transition for hover effects */
+  .hover-elevate {
+    @apply transition-all duration-200 ease-out;
+  }
+  .hover-elevate:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
 }
 
 @layer utilities {

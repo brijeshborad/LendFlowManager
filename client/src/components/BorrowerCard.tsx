@@ -70,95 +70,98 @@ export function BorrowerCard({
   };
 
   return (
-    <Card className="hover-elevate" data-testid={`card-borrower-${id}`}>
-      <CardContent className="p-6">
-        <div className="flex items-start gap-4">
-          <Avatar className="h-12 w-12">
+    <Card className="hover-elevate overflow-hidden" data-testid={`card-borrower-${id}`}>
+      <CardContent className="p-5">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <Avatar className="h-10 w-10">
             <AvatarImage src={avatar} alt={name} />
-            <AvatarFallback className="bg-primary text-primary-foreground">
+            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
               {getInitials(name)}
             </AvatarFallback>
           </Avatar>
-
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2 mb-2">
-              <div>
-                <h3 className="text-lg font-semibold">{name}</h3>
-                <div className="flex flex-col gap-0.5 text-sm text-muted-foreground mt-1">
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="h-3.5 w-3.5" />
-                    <span className="truncate">{email}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5" />
-                    <span>{phone}</span>
-                  </div>
-                </div>
-              </div>
-              <Badge className={cn("text-xs", getStatusColor())}>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="font-semibold truncate">{name}</h3>
+              <Badge className={cn("text-[10px] shrink-0", getStatusColor())}>
                 {status.toUpperCase()}
               </Badge>
             </div>
-
-            <div className="grid grid-cols-2 gap-4 my-4 p-4 bg-muted rounded-md">
-              <div>
-                <p className="text-xs text-muted-foreground">Total Lent</p>
-                <p className="text-base font-semibold font-mono">{totalLent}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Outstanding</p>
-                <p className="text-base font-semibold font-mono text-orange-600">{outstanding}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Interest Earned</p>
-                <p className="text-base font-semibold font-mono text-green-600">{interestEarned}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pending Interest</p>
-                <p className="text-base font-semibold font-mono text-red-600">{pendingInterest}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Paid</p>
-                <p className="text-base font-semibold font-mono text-blue-600">{totalPaid}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{paymentCount} payment{paymentCount !== 1 ? 's' : ''}</p>
-              </div>
-              {interestClearedTillDate && (
-                <div>
-                  <p className="text-xs text-muted-foreground">Interest Cleared Till</p>
-                  <p className="text-base font-semibold font-mono text-purple-600">{interestClearedTillDate}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 flex-wrap">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => onViewDetails?.(id)}
-                data-testid={`button-view-${id}`}
-              >
-                <Eye className="h-4 w-4 mr-1.5" />
-                View Details
-              </Button>
-              <Button 
-                size="sm" 
-                onClick={() => onAddPayment?.(id)}
-                data-testid={`button-add-payment-${id}`}
-              >
-                <Plus className="h-4 w-4 mr-1.5" />
-                Add Payment
-              </Button>
-              <Button 
-                size="sm" 
-                variant="secondary" 
-                onClick={() => onSendReminder?.(id)}
-                data-testid={`button-send-reminder-${id}`}
-              >
-                <Send className="h-4 w-4 mr-1.5" />
-                Send Reminder
-              </Button>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
+              <span className="flex items-center gap-1 truncate">
+                <Mail className="h-3 w-3 shrink-0" />
+                {email}
+              </span>
+              <span className="flex items-center gap-1 shrink-0">
+                <Phone className="h-3 w-3" />
+                {phone}
+              </span>
             </div>
           </div>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-3 gap-3 p-3 bg-muted/60 rounded-lg mb-4">
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Lent</p>
+            <p className="text-sm font-semibold font-mono mt-0.5">{totalLent}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Outstanding</p>
+            <p className="text-sm font-semibold font-mono text-orange-600 mt-0.5">{outstanding}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pending Int.</p>
+            <p className="text-sm font-semibold font-mono text-red-600 mt-0.5">{pendingInterest}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Int. Earned</p>
+            <p className="text-sm font-semibold font-mono text-green-600 mt-0.5">{interestEarned}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Total Paid</p>
+            <p className="text-sm font-semibold font-mono text-blue-600 mt-0.5">{totalPaid}</p>
+            <p className="text-[10px] text-muted-foreground">{paymentCount} payment{paymentCount !== 1 ? 's' : ''}</p>
+          </div>
+          {interestClearedTillDate && (
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cleared Till</p>
+              <p className="text-sm font-semibold font-mono text-purple-600 mt-0.5">{interestClearedTillDate}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 h-8 text-xs"
+            onClick={() => onViewDetails?.(id)}
+            data-testid={`button-view-${id}`}
+          >
+            <Eye className="h-3.5 w-3.5 mr-1" />
+            Details
+          </Button>
+          <Button
+            size="sm"
+            className="flex-1 h-8 text-xs"
+            onClick={() => onAddPayment?.(id)}
+            data-testid={`button-add-payment-${id}`}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Payment
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1 h-8 text-xs"
+            onClick={() => onSendReminder?.(id)}
+            data-testid={`button-send-reminder-${id}`}
+          >
+            <Send className="h-3.5 w-3.5 mr-1" />
+            Remind
+          </Button>
         </div>
       </CardContent>
     </Card>

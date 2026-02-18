@@ -105,65 +105,69 @@ export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit}>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-principal-amount">Principal Amount (₹) *</Label>
-              <Input
-                id="edit-principal-amount"
-                type="number"
-                placeholder="100000"
-                required
-                min="1"
-                step="0.01"
-                value={principalAmount}
-                onChange={(e) => setPrincipalAmount(e.target.value)}
-                disabled={updateLoanMutation.isPending}
-              />
+          <div className="grid gap-3.5 py-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-principal-amount" className="text-xs font-medium">Principal Amount (₹) *</Label>
+                <Input
+                  id="edit-principal-amount"
+                  type="number"
+                  placeholder="100000"
+                  required
+                  min="1"
+                  step="0.01"
+                  className="font-mono"
+                  value={principalAmount}
+                  onChange={(e) => setPrincipalAmount(e.target.value)}
+                  disabled={updateLoanMutation.isPending}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-interest-rate" className="text-xs font-medium">Interest Rate (%) *</Label>
+                <Input
+                  id="edit-interest-rate"
+                  type="number"
+                  placeholder="12.5"
+                  required
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  className="font-mono"
+                  value={interestRate}
+                  onChange={(e) => setInterestRate(e.target.value)}
+                  disabled={updateLoanMutation.isPending}
+                />
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-interest-rate">Interest Rate (%) *</Label>
-              <Input
-                id="edit-interest-rate"
-                type="number"
-                placeholder="12.5"
-                required
-                min="0"
-                max="100"
-                step="0.01"
-                value={interestRate}
-                onChange={(e) => setInterestRate(e.target.value)}
-                disabled={updateLoanMutation.isPending}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-interest-rate-type">Interest Rate Type *</Label>
-              <Select 
-                value={interestRateType} 
-                onValueChange={setInterestRateType}
-                disabled={updateLoanMutation.isPending}
-              >
-                <SelectTrigger id="edit-interest-rate-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                  <SelectItem value="annual">Annual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-start-date">Start Date *</Label>
-              <Input
-                id="edit-start-date"
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={updateLoanMutation.isPending}
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-interest-rate-type" className="text-xs font-medium">Interest Rate Type *</Label>
+                <Select
+                  value={interestRateType}
+                  onValueChange={setInterestRateType}
+                  disabled={updateLoanMutation.isPending}
+                >
+                  <SelectTrigger id="edit-interest-rate-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-start-date" className="text-xs font-medium">Start Date *</Label>
+                <Input
+                  id="edit-start-date"
+                  type="date"
+                  required
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  disabled={updateLoanMutation.isPending}
+                />
+              </div>
             </div>
           </div>
 
