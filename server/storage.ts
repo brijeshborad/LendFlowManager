@@ -7,6 +7,8 @@ import {
   emailLogs,
   emailTemplates,
   auditLogs,
+  fundHolders,
+  cashTransactions,
   type User,
   type UpsertUser,
   type Borrower,
@@ -23,6 +25,10 @@ import {
   type InsertEmailTemplate,
   type AuditLog,
   type InsertAuditLog,
+  type FundHolder,
+  type InsertFundHolder,
+  type CashTransaction,
+  type InsertCashTransaction,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ne, desc, gte, lte, sql, isNotNull } from "drizzle-orm";
@@ -87,7 +93,24 @@ export interface IStorage {
     totalOutstanding: string;
     totalPendingInterest: string;
     activeBorrowers: number;
+    cashOnHand?: number;
   }>;
+
+  // Loan close/settle
+  closeLoan(loanId: string, userId: string, settlementAmount?: string, settlementNotes?: string): Promise<Loan>;
+
+  // Fund holder operations
+  getFundHolders(userId: string): Promise<FundHolder[]>;
+  createFundHolder(fundHolder: InsertFundHolder): Promise<FundHolder>;
+  updateFundHolder(id: string, userId: string, data: Partial<InsertFundHolder>): Promise<FundHolder>;
+  deleteFundHolder(id: string, userId: string): Promise<void>;
+
+  // Cash transaction operations
+  getCashTransactions(userId: string, fundHolderId?: string): Promise<any[]>;
+  createCashTransaction(transaction: InsertCashTransaction): Promise<CashTransaction>;
+  updateCashTransaction(id: string, userId: string, updates: { amount?: string; fundHolderId?: string; notes?: string; transactionDate?: Date }): Promise<CashTransaction>;
+  deleteCashTransaction(id: string, userId: string): Promise<void>;
+  getCashBalances(userId: string): Promise<{ fundHolderId: string; name: string; balance: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -411,6 +434,7 @@ export class DatabaseStorage implements IStorage {
     totalOutstanding: string;
     totalPendingInterest: string;
     activeBorrowers: number;
+    cashOnHand?: number;
   }> {
     // Single query for loan stats + active borrowers count
     const [combinedStats, realTimeInterest] = await Promise.all([
@@ -437,11 +461,20 @@ export class DatabaseStorage implements IStorage {
     const outstandingPrincipal = totalLent - principalPaid;
     const interestPending = totalInterestGenerated - interestPaid;
 
+    // Check if cash tracking is enabled for this user
+    const user = await this.getUser(userId);
+    let cashOnHand: number | undefined;
+    if (user?.cashTrackingEnabled) {
+      const balances = await this.getCashBalances(userId);
+      cashOnHand = balances.reduce((sum, b) => sum + b.balance, 0);
+    }
+
     return {
       totalLent: `₹${totalLent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       totalOutstanding: `₹${outstandingPrincipal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       totalPendingInterest: `₹${interestPending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
       activeBorrowers,
+      cashOnHand,
     };
   }
 
@@ -960,6 +993,117 @@ export class DatabaseStorage implements IStorage {
       totalPendingInterest: parseFloat(totalPendingInterest.toFixed(2)),
       loanDetails,
     };
+  }
+  // Loan close/settle
+  async closeLoan(loanId: string, userId: string, settlementAmount?: string, settlementNotes?: string): Promise<Loan> {
+    const [updated] = await db
+      .update(loans)
+      .set({
+        status: "closed",
+        settlementAmount: settlementAmount || null,
+        settlementNotes: settlementNotes || null,
+        closedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(loans.id, loanId), eq(loans.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  // Fund holder operations
+  async getFundHolders(userId: string): Promise<FundHolder[]> {
+    return db.select().from(fundHolders).where(eq(fundHolders.userId, userId)).orderBy(fundHolders.name);
+  }
+
+  async createFundHolder(fundHolder: InsertFundHolder): Promise<FundHolder> {
+    const [newHolder] = await db.insert(fundHolders).values(fundHolder).returning();
+    return newHolder;
+  }
+
+  async updateFundHolder(id: string, userId: string, data: Partial<InsertFundHolder>): Promise<FundHolder> {
+    const [updated] = await db
+      .update(fundHolders)
+      .set({ ...data, updatedAt: new Date() })
+      .where(and(eq(fundHolders.id, id), eq(fundHolders.userId, userId)))
+      .returning();
+    return updated;
+  }
+
+  async deleteFundHolder(id: string, userId: string): Promise<void> {
+    await db.delete(fundHolders).where(and(eq(fundHolders.id, id), eq(fundHolders.userId, userId)));
+  }
+
+  // Cash transaction operations
+  async getCashTransactions(userId: string, fundHolderId?: string): Promise<any[]> {
+    const conditions = [eq(cashTransactions.userId, userId)];
+    if (fundHolderId) {
+      conditions.push(eq(cashTransactions.fundHolderId, fundHolderId));
+    }
+    return db
+      .select({
+        id: cashTransactions.id,
+        userId: cashTransactions.userId,
+        fundHolderId: cashTransactions.fundHolderId,
+        fundHolderName: fundHolders.name,
+        type: cashTransactions.type,
+        amount: cashTransactions.amount,
+        loanId: cashTransactions.loanId,
+        notes: cashTransactions.notes,
+        transactionDate: cashTransactions.transactionDate,
+        createdAt: cashTransactions.createdAt,
+      })
+      .from(cashTransactions)
+      .innerJoin(fundHolders, eq(cashTransactions.fundHolderId, fundHolders.id))
+      .where(and(...conditions))
+      .orderBy(desc(cashTransactions.transactionDate));
+  }
+
+  async createCashTransaction(transaction: InsertCashTransaction): Promise<CashTransaction> {
+    const [newTransaction] = await db.insert(cashTransactions).values(transaction).returning();
+    return newTransaction;
+  }
+
+  async updateCashTransaction(id: string, userId: string, updates: { amount?: string; fundHolderId?: string; notes?: string; transactionDate?: Date }): Promise<CashTransaction> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (updates.amount !== undefined) updateData.amount = updates.amount;
+    if (updates.fundHolderId !== undefined) updateData.fundHolderId = updates.fundHolderId;
+    if (updates.notes !== undefined) updateData.notes = updates.notes;
+    if (updates.transactionDate !== undefined) updateData.transactionDate = updates.transactionDate;
+
+    const [updated] = await db
+      .update(cashTransactions)
+      .set(updateData)
+      .where(and(eq(cashTransactions.id, id), eq(cashTransactions.userId, userId)))
+      .returning();
+    if (!updated) throw new Error("Cash transaction not found");
+    return updated;
+  }
+
+  async deleteCashTransaction(id: string, userId: string): Promise<void> {
+    await db.delete(cashTransactions).where(and(eq(cashTransactions.id, id), eq(cashTransactions.userId, userId)));
+  }
+
+  async getCashBalances(userId: string): Promise<{ fundHolderId: string; name: string; balance: number }[]> {
+    const holders = await this.getFundHolders(userId);
+    const result = [];
+
+    for (const holder of holders) {
+      const [stats] = await db
+        .select({
+          inflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('inflow', 'payment_collection') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          outflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('outflow', 'loan_disbursement') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        })
+        .from(cashTransactions)
+        .where(and(eq(cashTransactions.userId, userId), eq(cashTransactions.fundHolderId, holder.id)));
+
+      result.push({
+        fundHolderId: holder.id,
+        name: holder.name,
+        balance: (stats?.inflow || 0) - (stats?.outflow || 0),
+      });
+    }
+
+    return result;
   }
 }
 

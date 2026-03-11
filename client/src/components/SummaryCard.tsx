@@ -27,7 +27,7 @@ export function SummaryCard({
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-            <p className="text-2xl font-bold font-mono tracking-tight mt-1.5 truncate">{value}</p>
+            <p className="text-xl md:text-2xl font-bold font-mono tracking-tight mt-1.5 truncate">{value}</p>
             {subValue && (
               <p className="text-xs text-muted-foreground mt-1">{subValue}</p>
             )}

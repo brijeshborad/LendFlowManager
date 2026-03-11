@@ -1,5 +1,6 @@
-import { Home, Users, Wallet, TrendingUp, FileText, Settings, Bell, Mail, Calculator } from "lucide-react";
+import { Home, Users, Wallet, FileText, Settings, Bell, Mail, Calculator, Banknote } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -54,6 +55,12 @@ const reminderItems = [
 ];
 
 export function AppSidebar() {
+  const { data: userSettings } = useQuery<any>({
+    queryKey: ["/api/user/settings"],
+  });
+
+  const cashTrackingEnabled = userSettings?.cashTrackingEnabled ?? false;
+
   return (
     <Sidebar>
       <SidebarContent>
@@ -71,6 +78,16 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+              {cashTrackingEnabled && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton asChild data-testid="sidebar-cashbook">
+                    <Link href="/cashbook">
+                      <Banknote className="h-4 w-4" />
+                      <span>Cash Book</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

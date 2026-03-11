@@ -101,12 +101,12 @@ export default function Reports() {
   const totalOutstanding = loanSummary.reduce((sum, loan) => sum + loan.balance, 0);
 
   return (
-    <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-semibold" data-testid="heading-reports">
+    <div className="p-4 md:p-8">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-semibold" data-testid="heading-reports">
           Reports
         </h1>
-        <p className="text-muted-foreground mt-1">
+        <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
           Comprehensive financial reports and analytics
         </p>
       </div>
@@ -174,12 +174,14 @@ export default function Reports() {
       </div>
 
       <Tabs defaultValue="loans" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="loans" data-testid="tab-loans">Loan Summary</TabsTrigger>
-          <TabsTrigger value="payments" data-testid="tab-payments">Payment History</TabsTrigger>
-          <TabsTrigger value="interest" data-testid="tab-interest">Interest Earned</TabsTrigger>
-          <TabsTrigger value="borrowers" data-testid="tab-borrowers">Borrower Summary</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+          <TabsList className="w-max sm:w-auto">
+            <TabsTrigger value="loans" data-testid="tab-loans" className="text-xs sm:text-sm">Loans</TabsTrigger>
+            <TabsTrigger value="payments" data-testid="tab-payments" className="text-xs sm:text-sm">Payments</TabsTrigger>
+            <TabsTrigger value="interest" data-testid="tab-interest" className="text-xs sm:text-sm">Interest</TabsTrigger>
+            <TabsTrigger value="borrowers" data-testid="tab-borrowers" className="text-xs sm:text-sm">Borrowers</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="loans" className="space-y-4">
           <Card>
@@ -197,6 +199,7 @@ export default function Reports() {
               ) : loanSummary.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No loans found</div>
               ) : (
+                <div className="overflow-x-auto -mx-6 px-6">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -255,6 +258,7 @@ export default function Reports() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -276,6 +280,7 @@ export default function Reports() {
               ) : paymentHistory.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No payments found</div>
               ) : (
+                <div className="overflow-x-auto -mx-6 px-6">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -328,6 +333,7 @@ export default function Reports() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -372,6 +378,7 @@ export default function Reports() {
                     </ResponsiveContainer>
                   </div>
 
+                  <div className="overflow-x-auto -mx-6 px-6">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -390,6 +397,7 @@ export default function Reports() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </>
               )}
             </CardContent>
@@ -428,6 +436,7 @@ export default function Reports() {
                     </ResponsiveContainer>
                   </div>
 
+                  <div className="overflow-x-auto -mx-6 px-6">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -473,6 +482,7 @@ export default function Reports() {
                       ))}
                     </TableBody>
                   </Table>
+                  </div>
                 </>
               )}
             </CardContent>

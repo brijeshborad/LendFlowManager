@@ -202,16 +202,16 @@ export default function Borrowers() {
 
   if (selectedBorrower) {
     return (
-      <div className="p-8 space-y-6">
-        <Button variant="ghost" onClick={() => setSelectedBorrowerId(null)}>
+      <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+        <Button variant="ghost" size="sm" onClick={() => setSelectedBorrowerId(null)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Borrowers
         </Button>
-        
-        <div className="flex items-center justify-between">
+
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-semibold">{selectedBorrower.name}</h1>
-            <div className="flex items-center gap-4 mt-1">
+            <h1 className="text-2xl md:text-3xl font-semibold">{selectedBorrower.name}</h1>
+            <div className="flex flex-wrap items-center gap-2 md:gap-4 mt-1">
               <p className="text-muted-foreground">{selectedBorrower.email} • {selectedBorrower.phone}</p>
               <div className="flex items-center gap-2 px-3 py-1 bg-purple-50 rounded-full">
                 <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
@@ -222,13 +222,13 @@ export default function Borrowers() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button onClick={() => setAddLoanModalOpen(true)} variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Loan
+            <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setAddLoanModalOpen(true)} variant="outline">
+              <Plus className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Create </span>Loan
             </Button>
-            <Button onClick={() => setAddPaymentModalOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Payment
+            <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setAddPaymentModalOpen(true)}>
+              <Plus className="h-4 w-4 mr-1 md:mr-2" />
+              Payment
             </Button>
           </div>
         </div>
@@ -519,17 +519,17 @@ export default function Borrowers() {
   }
   
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold">Borrowers</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-semibold">Borrowers</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
             Manage your borrowers and their details
           </p>
         </div>
-        <Button onClick={() => setAddModalOpen(true)} data-testid="button-add-borrower">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add Borrower
+        <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setAddModalOpen(true)} data-testid="button-add-borrower">
+          <UserPlus className="h-4 w-4 mr-1 md:mr-2" />
+          <span className="hidden sm:inline">Add </span>Borrower
         </Button>
       </div>
 
@@ -552,7 +552,7 @@ export default function Borrowers() {
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {borrowers.map((borrower) => (
             <Card key={borrower.id} className="hover-elevate cursor-pointer overflow-hidden" onClick={() => setSelectedBorrowerId(borrower.id)} data-testid={`card-borrower-${borrower.id}`}>
               <CardContent className="p-5">

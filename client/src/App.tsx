@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/Dashboard";
@@ -17,6 +18,7 @@ import Reminders from "@/pages/Reminders";
 import EmailTemplates from "@/pages/EmailTemplates";
 import Settings from "@/pages/Settings";
 import PendingInterestCalculator from "@/pages/PendingInterestCalculator";
+import CashBook from "@/pages/CashBook";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -44,6 +46,7 @@ function Router() {
           <Route path="/loans" component={Loans} />
           <Route path="/reports" component={Reports} />
           <Route path="/calculator" component={PendingInterestCalculator} />
+          <Route path="/cashbook" component={CashBook} />
           <Route path="/reminders" component={Reminders} />
           <Route path="/templates" component={EmailTemplates} />
           <Route path="/settings" component={Settings} />
@@ -68,11 +71,12 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
           <AppSidebar />
           <div className="flex flex-col flex-1 overflow-hidden">
             <DashboardHeader />
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
               {children}
             </main>
           </div>
         </div>
+        <MobileBottomNav />
       </SidebarProvider>
     );
   }

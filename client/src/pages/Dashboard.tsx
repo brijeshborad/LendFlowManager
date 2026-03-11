@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LucideIndianRupee, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon } from "lucide-react";
+import { LucideIndianRupee, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon, HandCoins } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
 import { BorrowerCard } from "@/components/BorrowerCard";
 import { InterestChart } from "@/components/InterestChart";
@@ -22,6 +22,7 @@ interface DashboardStats {
   totalOutstanding: string;
   totalPendingInterest: string;
   activeBorrowers: number;
+  cashOnHand?: number;
 }
 
 export default function Dashboard() {
@@ -318,22 +319,22 @@ export default function Dashboard() {
   const avatars = [avatar1, avatar2, avatar3];
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-semibold">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-semibold">Dashboard</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
             Overview of your lending portfolio
           </p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setBorrowerModalOpen(true)} data-testid="button-add-borrower">
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Borrower
+          <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setBorrowerModalOpen(true)} data-testid="button-add-borrower">
+            <UserPlus className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden sm:inline">Add </span>Borrower
           </Button>
-          <Button variant="outline" onClick={handleQuickPayment} data-testid="button-quick-payment">
-            <Plus className="h-4 w-4 mr-2" />
-            Quick Payment
+          <Button size="sm" className="md:h-10 md:px-4 md:text-sm" variant="outline" onClick={handleQuickPayment} data-testid="button-quick-payment">
+            <Plus className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden sm:inline">Quick </span>Payment
           </Button>
         </div>
       </div>
@@ -347,10 +348,19 @@ export default function Dashboard() {
       ) : (
         <div className="space-y-4">
           {/* Primary metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            {stats?.cashOnHand !== undefined && stats?.cashOnHand !== null && (
+              <SummaryCard
+                title="Cash on Hand"
+                value={formatCurrency(stats.cashOnHand)}
+                subValue="All fund holders"
+                icon={HandCoins}
+                iconColor="bg-cyan-500"
+              />
+            )}
             <SummaryCard
               title="Total Amount Lent"
-              value={formatCurrency(stats?.totalLent || 0) || "₹0"}
+              value={stats?.totalLent || "₹0"}
               subValue="All time"
               icon={LucideIndianRupee}
               iconColor="bg-blue-500"
@@ -378,7 +388,7 @@ export default function Dashboard() {
           </div>
 
           {/* Secondary metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
             <SummaryCard
               title="Active Borrowers"
               value={String(stats?.activeBorrowers || 0)}
@@ -556,17 +566,17 @@ export default function Dashboard() {
 
           <div>
             <Tabs defaultValue="all" className="w-full">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold">Borrowers</h2>
-                <TabsList>
-                  <TabsTrigger value="all" data-testid="tab-all">All ({borrowers.length})</TabsTrigger>
-                  <TabsTrigger value="active" data-testid="tab-active">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                <h2 className="text-lg md:text-xl font-semibold">Borrowers</h2>
+                <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
+                  <TabsTrigger value="all" data-testid="tab-all" className="text-xs sm:text-sm">All ({borrowers.length})</TabsTrigger>
+                  <TabsTrigger value="active" data-testid="tab-active" className="text-xs sm:text-sm">
                     Active ({borrowers.filter((b) => b.status === 'active').length})
                   </TabsTrigger>
-                  <TabsTrigger value="overdue" data-testid="tab-overdue">
+                  <TabsTrigger value="overdue" data-testid="tab-overdue" className="text-xs sm:text-sm">
                     Overdue ({borrowers.filter((b) => b.status === 'overdue').length})
                   </TabsTrigger>
-                  <TabsTrigger value="settled" data-testid="tab-settled">
+                  <TabsTrigger value="settled" data-testid="tab-settled" className="text-xs sm:text-sm">
                     Settled ({borrowers.filter((b) => b.status === 'settled').length})
                   </TabsTrigger>
                 </TabsList>

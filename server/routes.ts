@@ -12,6 +12,8 @@ import {
     insertPaymentSchema,
     insertReminderSchema,
     insertEmailTemplateSchema,
+    insertFundHolderSchema,
+    insertCashTransactionSchema,
     type User,
 } from "@shared/schema";
 import {
@@ -109,11 +111,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.patch("/api/user/preferences", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            const {notificationPreferences, interestCalculationMethod, autoLogoutMinutes} = req.body;
+            const {notificationPreferences, interestCalculationMethod, autoLogoutMinutes, cashTrackingEnabled} = req.body;
             const user = await storage.updateUserPreferences(userId, {
                 notificationPreferences,
                 interestCalculationMethod,
                 autoLogoutMinutes,
+                cashTrackingEnabled,
             });
             // Don't send password in response
             const {password, ...userWithoutPassword} = user;
@@ -372,12 +375,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 // Don't fail the loan creation if interest generation fails
             }
 
+            // Create cash disbursement transactions if provided
+            const disbursements = req.body.disbursements as Array<{ fundHolderId: string; amount: string }> | undefined;
+            if (disbursements && disbursements.length > 0) {
+                for (const d of disbursements) {
+                    await storage.createCashTransaction({
+                        userId,
+                        fundHolderId: d.fundHolderId,
+                        type: "loan_disbursement",
+                        amount: d.amount,
+                        loanId: loan.id,
+                        notes: `Loan disbursement to ${req.body._borrowerName || 'borrower'}`,
+                        transactionDate: loan.startDate,
+                    });
+                }
+            }
+
             await storage.createAuditLog({
                 userId,
                 action: "create_loan",
                 entityType: "loan",
                 entityId: loan.id,
-                changes: {amount: loan.principalAmount, borrowerId: loan.borrowerId},
+                changes: {amount: loan.principalAmount, borrowerId: loan.borrowerId, disbursements},
                 ipAddress: req.ip,
                 userAgent: req.get("user-agent"),
             });
@@ -452,6 +471,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    // Loan close/settle route
+    app.post("/api/loans/:id/close", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const { settlementAmount, settlementNotes } = req.body;
+
+            const loan = await storage.getLoan(req.params.id, userId);
+            if (!loan) {
+                return res.status(404).json({message: "Loan not found"});
+            }
+            if (loan.status === "closed") {
+                return res.status(400).json({message: "Loan is already closed"});
+            }
+
+            const updated = await storage.closeLoan(req.params.id, userId, settlementAmount, settlementNotes);
+
+            await storage.createAuditLog({
+                userId,
+                action: "close_loan",
+                entityType: "loan",
+                entityId: updated.id,
+                changes: {status: "settled", settlementAmount, settlementNotes},
+                ipAddress: req.ip,
+                userAgent: req.get("user-agent"),
+            });
+
+            broadcastToUser(userId, {
+                type: "loan_updated",
+                data: updated,
+            });
+
+            res.json(updated);
+        } catch (error: any) {
+            console.error("Error closing loan:", error);
+            res.status(500).json({message: error.message || "Failed to close loan"});
+        }
+    });
+
     // Payment routes
     app.get("/api/payments", isAuthenticated, async (req: any, res: Response) => {
         try {
@@ -483,12 +540,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const payment = await storage.createPayment(validated);
 
+            // If cash tracking is enabled and a fund holder collected the payment, create a cash inflow
+            const { collectedByFundHolderId } = req.body;
+            if (collectedByFundHolderId) {
+                const user = await storage.getUser(userId);
+                if (user?.cashTrackingEnabled) {
+                    const loan = await storage.getLoan(validated.loanId, userId);
+                    const borrower = loan ? await storage.getBorrower(loan.borrowerId, userId) : null;
+                    await storage.createCashTransaction({
+                        userId,
+                        fundHolderId: collectedByFundHolderId,
+                        type: "payment_collection",
+                        amount: validated.amount as string,
+                        loanId: validated.loanId,
+                        notes: `Payment collected from ${borrower?.name || 'borrower'} - ${validated.paymentType}`,
+                        transactionDate: validated.paymentDate,
+                    });
+                }
+            }
+
             await storage.createAuditLog({
                 userId,
                 action: "add_payment",
                 entityType: "payment",
                 entityId: payment.id,
-                changes: {amount: payment.amount, type: payment.paymentType, loanId: payment.loanId},
+                changes: {amount: payment.amount, type: payment.paymentType, loanId: payment.loanId, collectedByFundHolderId},
                 ipAddress: req.ip,
                 userAgent: req.get("user-agent"),
             });
@@ -882,6 +958,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (error: any) {
             console.error("Error calculating pending interest:", error);
             res.status(500).json({message: "Failed to calculate pending interest"});
+        }
+    });
+
+    // Fund holder routes
+    app.get("/api/fund-holders", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const holders = await storage.getFundHolders(userId);
+            res.json(holders);
+        } catch (error: any) {
+            console.error("Error fetching fund holders:", error);
+            res.status(500).json({message: "Failed to fetch fund holders"});
+        }
+    });
+
+    app.post("/api/fund-holders", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const validated = insertFundHolderSchema.parse({...req.body, userId});
+            const holder = await storage.createFundHolder(validated);
+            res.status(201).json(holder);
+        } catch (error: any) {
+            console.error("Error creating fund holder:", error);
+            res.status(400).json({message: error.message || "Failed to create fund holder"});
+        }
+    });
+
+    app.patch("/api/fund-holders/:id", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const holder = await storage.updateFundHolder(req.params.id, userId, req.body);
+            res.json(holder);
+        } catch (error: any) {
+            console.error("Error updating fund holder:", error);
+            res.status(400).json({message: error.message || "Failed to update fund holder"});
+        }
+    });
+
+    app.delete("/api/fund-holders/:id", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            await storage.deleteFundHolder(req.params.id, userId);
+            res.status(204).send();
+        } catch (error: any) {
+            console.error("Error deleting fund holder:", error);
+            res.status(500).json({message: "Failed to delete fund holder"});
+        }
+    });
+
+    // Cash transaction routes
+    app.get("/api/cash-transactions", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const fundHolderId = req.query.fundHolderId as string | undefined;
+            const transactions = await storage.getCashTransactions(userId, fundHolderId);
+            res.json(transactions);
+        } catch (error: any) {
+            console.error("Error fetching cash transactions:", error);
+            res.status(500).json({message: "Failed to fetch cash transactions"});
+        }
+    });
+
+    app.post("/api/cash-transactions", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const validated = insertCashTransactionSchema.parse({
+                ...req.body,
+                userId,
+                transactionDate: req.body.transactionDate ? new Date(req.body.transactionDate) : new Date(),
+            });
+            const transaction = await storage.createCashTransaction(validated);
+
+            await storage.createAuditLog({
+                userId,
+                action: "create_cash_transaction",
+                entityType: "cash_transaction",
+                entityId: transaction.id,
+                changes: {type: transaction.type, amount: transaction.amount, fundHolderId: transaction.fundHolderId},
+                ipAddress: req.ip,
+                userAgent: req.get("user-agent"),
+            });
+
+            res.status(201).json(transaction);
+        } catch (error: any) {
+            console.error("Error creating cash transaction:", error);
+            res.status(400).json({message: error.message || "Failed to create cash transaction"});
+        }
+    });
+
+    app.patch("/api/cash-transactions/:id", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const { amount, fundHolderId, notes, transactionDate } = req.body;
+            const updates: { amount?: string; fundHolderId?: string; notes?: string; transactionDate?: Date } = {};
+            if (amount !== undefined) updates.amount = amount;
+            if (fundHolderId !== undefined) updates.fundHolderId = fundHolderId;
+            if (notes !== undefined) updates.notes = notes;
+            if (transactionDate !== undefined) updates.transactionDate = new Date(transactionDate);
+
+            const transaction = await storage.updateCashTransaction(req.params.id, userId, updates);
+
+            await storage.createAuditLog({
+                userId,
+                action: "update_cash_transaction",
+                entityType: "cash_transaction",
+                entityId: transaction.id,
+                changes: updates,
+                ipAddress: req.ip,
+                userAgent: req.get("user-agent"),
+            });
+
+            res.json(transaction);
+        } catch (error: any) {
+            console.error("Error updating cash transaction:", error);
+            res.status(400).json({ message: error.message || "Failed to update cash transaction" });
+        }
+    });
+
+    app.delete("/api/cash-transactions/:id", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            await storage.deleteCashTransaction(req.params.id, userId);
+            res.status(204).send();
+        } catch (error: any) {
+            console.error("Error deleting cash transaction:", error);
+            res.status(500).json({message: "Failed to delete cash transaction"});
+        }
+    });
+
+    app.get("/api/cash-transactions/balances", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const balances = await storage.getCashBalances(userId);
+            res.json(balances);
+        } catch (error: any) {
+            console.error("Error fetching cash balances:", error);
+            res.status(500).json({message: "Failed to fetch cash balances"});
         }
     });
 

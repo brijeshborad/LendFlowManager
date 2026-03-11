@@ -33,6 +33,7 @@ const preferencesSchema = z.object({
   }),
   interestCalculationMethod: z.enum(["simple", "compound"]),
   autoLogoutMinutes: z.coerce.number().min(5).max(120),
+  cashTrackingEnabled: z.boolean(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -81,6 +82,7 @@ export default function Settings() {
       },
       interestCalculationMethod: "simple",
       autoLogoutMinutes: 30,
+      cashTrackingEnabled: false,
     },
   });
 
@@ -106,6 +108,7 @@ export default function Settings() {
         },
         interestCalculationMethod: settings.interestCalculationMethod || "simple",
         autoLogoutMinutes: settings.autoLogoutMinutes || 30,
+        cashTrackingEnabled: settings.cashTrackingEnabled ?? false,
       });
     }
   }, [userSettings, preferencesForm]);
@@ -158,8 +161,10 @@ export default function Settings() {
           },
           interestCalculationMethod: settings.interestCalculationMethod || "simple",
           autoLogoutMinutes: settings.autoLogoutMinutes || 30,
+          cashTrackingEnabled: settings.cashTrackingEnabled ?? false,
         });
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Preferences Updated",
         description: "Your preferences have been saved successfully.",
@@ -201,26 +206,26 @@ export default function Settings() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Settings</h1>
-        <p className="text-muted-foreground">
+    <div className="container mx-auto p-4 md:p-6 max-w-5xl">
+      <div className="mb-4 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-1 md:mb-2">Settings</h1>
+        <p className="text-sm md:text-base text-muted-foreground">
           Manage your profile, preferences, and security settings
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="profile" data-testid="tab-profile">
-            <User className="h-4 w-4 mr-2" />
+          <TabsTrigger value="profile" data-testid="tab-profile" className="text-xs sm:text-sm">
+            <User className="h-4 w-4 mr-1 sm:mr-2" />
             Profile
           </TabsTrigger>
-          <TabsTrigger value="preferences" data-testid="tab-preferences">
-            <Bell className="h-4 w-4 mr-2" />
-            Preferences
+          <TabsTrigger value="preferences" data-testid="tab-preferences" className="text-xs sm:text-sm">
+            <Bell className="h-4 w-4 mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Preferences</span><span className="sm:hidden">Prefs</span>
           </TabsTrigger>
-          <TabsTrigger value="security" data-testid="tab-security">
-            <Shield className="h-4 w-4 mr-2" />
+          <TabsTrigger value="security" data-testid="tab-security" className="text-xs sm:text-sm">
+            <Shield className="h-4 w-4 mr-1 sm:mr-2" />
             Security
           </TabsTrigger>
         </TabsList>
@@ -453,6 +458,34 @@ export default function Settings() {
                           <FormDescription>
                             Automatically log out after this many minutes of inactivity (5-120 minutes)
                           </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Modules</h3>
+
+                    <FormField
+                      control={preferencesForm.control}
+                      name="cashTrackingEnabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base">Cash Book</FormLabel>
+                            <FormDescription>
+                              Track cash held by fund holders, inflows, outflows, and loan disbursements
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="switch-cash-tracking"
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />

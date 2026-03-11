@@ -110,21 +110,21 @@ export default function EmailTemplates() {
   };
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-8">
+      <div className="flex items-center justify-between gap-3 mb-4 md:mb-6">
         <div>
-          <h1 className="text-3xl font-semibold" data-testid="heading-templates">
+          <h1 className="text-2xl md:text-3xl font-semibold" data-testid="heading-templates">
             Email Templates
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Create and manage email templates for automated communications
+          <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
+            Create and manage email templates
           </p>
         </div>
         <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-add-template">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Template
+            <Button size="sm" className="md:h-10 md:px-4 md:text-sm" data-testid="button-add-template">
+              <Plus className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Add </span>Template
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl">

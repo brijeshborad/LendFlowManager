@@ -76,7 +76,7 @@
   --chart-4: 32 95% 44%;
   --chart-5: 340 82% 52%;
 
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-serif: Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-mono: 'JetBrains Mono', 'Courier New', Courier, monospace;
   --radius: .5rem; /* 8px */
@@ -239,6 +239,14 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Prevent iOS zoom on input focus (font-size must be >= 16px) */
+  @media (max-width: 767px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 
   /* Smooth transitions for all interactive elements */
@@ -246,13 +254,23 @@
     @apply transition-colors duration-150;
   }
 
-  /* Card transition for hover effects */
+  /* Card transition for hover effects - disable on touch */
   .hover-elevate {
     @apply transition-all duration-200 ease-out;
   }
-  .hover-elevate:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+  @media (hover: hover) {
+    .hover-elevate:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+  }
+
+  /* Safe area for bottom nav */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
 

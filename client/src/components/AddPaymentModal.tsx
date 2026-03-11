@@ -16,7 +16,7 @@ import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue,} from "@/
 import {Upload} from "lucide-react";
 import {useToast} from "@/hooks/use-toast";
 import {apiRequest, queryClient} from "@/lib/queryClient";
-import type {Borrower, Loan} from "@shared/schema";
+import type {Borrower, Loan, FundHolder} from "@shared/schema";
 
 interface AddPaymentModalProps {
     open: boolean;
@@ -36,6 +36,7 @@ export function AddPaymentModal({
     const [loanId, setLoanId] = useState(preSelectedLoanId || "");
     const [paymentType, setPaymentType] = useState("");
     const [paymentMethod, setPaymentMethod] = useState("cash");
+    const [collectedByFundHolderId, setCollectedByFundHolderId] = useState("");
     const [borrowerLoans, setBorrowerLoans] = useState<Loan[]>([]);
 
     // Reset state when modal closes or props change
@@ -65,6 +66,18 @@ export function AddPaymentModal({
         enabled: open && !!loanId,
     });
 
+    // Fetch user settings and fund holders for cash tracking
+    const {data: userSettings} = useQuery<any>({
+        queryKey: ['/api/user/settings'],
+        enabled: open,
+    });
+    const {data: fundHolders = []} = useQuery<FundHolder[]>({
+        queryKey: ['/api/fund-holders'],
+        enabled: open && userSettings?.cashTrackingEnabled,
+    });
+
+    const showCollectedBy = userSettings?.cashTrackingEnabled && fundHolders.length > 0;
+
     const minInterestClearedTillDate = loanId
         ? allPayments
             .filter((p: any) => p.loanId === loanId && p.interestClearedTillDate)
@@ -91,10 +104,13 @@ export function AddPaymentModal({
             queryClient.invalidateQueries({queryKey: ['/api/payments']});
             queryClient.invalidateQueries({queryKey: ['/api/loans']});
             queryClient.invalidateQueries({queryKey: ['/api/dashboard/stats']});
+            queryClient.invalidateQueries({queryKey: ['/api/cash-transactions']});
+            queryClient.invalidateQueries({queryKey: ['/api/cash-transactions/balances']});
             toast({
                 title: "Payment added",
                 description: "The payment has been recorded successfully.",
             });
+            setCollectedByFundHolderId("");
             onClose();
         },
         onError: (error: any) => {
@@ -140,12 +156,13 @@ export function AddPaymentModal({
             transactionReference: formData.get("reference")?.toString() || null,
             notes: formData.get("notes")?.toString() || null,
             interestClearedTillDate: formData.get("interest-cleared-till")?.toString() || null,
+            ...(collectedByFundHolderId && { collectedByFundHolderId }),
         });
     };
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl" data-testid="modal-add-payment">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="modal-add-payment">
                 <DialogHeader>
                     <DialogTitle>Add Payment</DialogTitle>
                     <DialogDescription>
@@ -243,6 +260,27 @@ export function AddPaymentModal({
                                 </Select>
                             </div>
                         </div>
+
+                        {showCollectedBy && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="collected-by" className="text-xs font-medium">Collected By (Fund Holder)</Label>
+                                <Select value={collectedByFundHolderId} onValueChange={setCollectedByFundHolderId}>
+                                    <SelectTrigger id="collected-by">
+                                        <SelectValue placeholder="Select fund holder (optional)"/>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {fundHolders.map((fh: FundHolder) => (
+                                            <SelectItem key={fh.id} value={fh.id}>
+                                                {fh.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-xs text-muted-foreground">
+                                    Cash will be added back to this fund holder's balance
+                                </p>
+                            </div>
+                        )}
 
                         <div className="space-y-1.5">
                             <Label htmlFor="reference" className="text-xs font-medium">Transaction Reference (Optional)</Label>

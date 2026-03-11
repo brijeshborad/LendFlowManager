@@ -49,6 +49,7 @@ export const users = pgTable("users", {
   }),
   interestCalculationMethod: text("interest_calculation_method").default("simple"), // "simple" or "compound"
   autoLogoutMinutes: integer("auto_logout_minutes").default(30),
+  cashTrackingEnabled: boolean("cash_tracking_enabled").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -118,6 +119,9 @@ export const loans = pgTable("loans", {
   status: text("status").default("active"), // "active", "settled", "closed"
   documentUrls: text("document_urls").array().default([]), // URLs to uploaded documents as text array
   notes: text("notes"),
+  settlementAmount: decimal("settlement_amount", { precision: 15, scale: 2 }), // amount written off when settling
+  settlementNotes: text("settlement_notes"),
+  closedAt: timestamp("closed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => ({
@@ -310,3 +314,53 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
+
+// Fund holders table (partners who hold cash - e.g. Brijesh, Akshay)
+export const fundHolders = pgTable("fund_holders", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdIdx: index("idx_fund_holders_user_id").on(table.userId),
+}));
+
+export const insertFundHolderSchema = createInsertSchema(fundHolders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertFundHolder = z.infer<typeof insertFundHolderSchema>;
+export type FundHolder = typeof fundHolders.$inferSelect;
+
+// Cash transactions table (inflows, outflows, loan disbursements)
+export const cashTransactions = pgTable("cash_transactions", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  fundHolderId: text("fund_holder_id").notNull().references(() => fundHolders.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // "inflow", "outflow", "loan_disbursement", "payment_collection"
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  loanId: text("loan_id").references(() => loans.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  transactionDate: timestamp("transaction_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  userIdIdx: index("idx_cash_transactions_user_id").on(table.userId),
+  fundHolderIdIdx: index("idx_cash_transactions_fund_holder_id").on(table.fundHolderId),
+  typeIdx: index("idx_cash_transactions_type").on(table.type),
+  transactionDateIdx: index("idx_cash_transactions_date").on(table.transactionDate),
+}));
+
+export const insertCashTransactionSchema = createInsertSchema(cashTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({
+  transactionDate: z.coerce.date(),
+});
+
+export type InsertCashTransaction = z.infer<typeof insertCashTransactionSchema>;
+export type CashTransaction = typeof cashTransactions.$inferSelect;
