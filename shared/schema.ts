@@ -335,14 +335,16 @@ export const insertFundHolderSchema = createInsertSchema(fundHolders).omit({
 export type InsertFundHolder = z.infer<typeof insertFundHolderSchema>;
 export type FundHolder = typeof fundHolders.$inferSelect;
 
-// Cash transactions table (inflows, outflows, loan disbursements)
+// Cash transactions table (inflows, outflows, loan disbursements, transfers)
 export const cashTransactions = pgTable("cash_transactions", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   fundHolderId: text("fund_holder_id").notNull().references(() => fundHolders.id, { onDelete: "cascade" }),
-  type: text("type").notNull(), // "inflow", "outflow", "loan_disbursement", "payment_collection"
+  type: text("type").notNull(), // "inflow", "outflow", "loan_disbursement", "payment_collection", "transfer_in", "transfer_out"
   amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
   loanId: text("loan_id").references(() => loans.id, { onDelete: "set null" }),
+  paymentId: text("payment_id").references(() => payments.id, { onDelete: "cascade" }),
+  transferGroupId: text("transfer_group_id"),
   notes: text("notes"),
   transactionDate: timestamp("transaction_date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
@@ -352,6 +354,7 @@ export const cashTransactions = pgTable("cash_transactions", {
   fundHolderIdIdx: index("idx_cash_transactions_fund_holder_id").on(table.fundHolderId),
   typeIdx: index("idx_cash_transactions_type").on(table.type),
   transactionDateIdx: index("idx_cash_transactions_date").on(table.transactionDate),
+  paymentIdIdx: index("idx_cash_transactions_payment_id").on(table.paymentId),
 }));
 
 export const insertCashTransactionSchema = createInsertSchema(cashTransactions).omit({
@@ -360,6 +363,7 @@ export const insertCashTransactionSchema = createInsertSchema(cashTransactions).
   updatedAt: true,
 }).extend({
   transactionDate: z.coerce.date(),
+  type: z.enum(["inflow", "outflow", "loan_disbursement", "payment_collection", "transfer_in", "transfer_out"]),
 });
 
 export type InsertCashTransaction = z.infer<typeof insertCashTransactionSchema>;

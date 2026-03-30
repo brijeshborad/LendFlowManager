@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  ArrowLeftRight,
   Banknote,
   Plus,
   Trash2,
@@ -49,6 +50,7 @@ export default function CashBook() {
   const { toast } = useToast();
   const [addHolderOpen, setAddHolderOpen] = useState(false);
   const [addTransactionOpen, setAddTransactionOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
   const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
   const [holderName, setHolderName] = useState("");
   const [txFundHolderId, setTxFundHolderId] = useState("");
@@ -57,6 +59,13 @@ export default function CashBook() {
   const [txNotes, setTxNotes] = useState("");
   const [txDate, setTxDate] = useState(new Date().toISOString().split("T")[0]);
   const [filterHolder, setFilterHolder] = useState<string>("all");
+
+  // Transfer state
+  const [transferFrom, setTransferFrom] = useState("");
+  const [transferTo, setTransferTo] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferNotes, setTransferNotes] = useState("");
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().split("T")[0]);
 
   const { data: fundHolders = [] } = useQuery<FundHolder[]>({
     queryKey: ["/api/fund-holders"],
@@ -104,6 +113,23 @@ export default function CashBook() {
     },
   });
 
+  const createTransferMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/cash-transactions/transfer", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Transfer completed" });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-transactions/balances"] });
+      resetTransferForm();
+      setTransferOpen(false);
+    },
+    onError: (e: any) => {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
+  });
+
   const deleteTransactionMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", `/api/cash-transactions/${id}`);
@@ -116,6 +142,7 @@ export default function CashBook() {
     },
     onError: (e: any) => {
       toast({ title: "Error", description: e.message, variant: "destructive" });
+      setDeleteTransactionId(null);
     },
   });
 
@@ -127,6 +154,14 @@ export default function CashBook() {
     setTxDate(new Date().toISOString().split("T")[0]);
   };
 
+  const resetTransferForm = () => {
+    setTransferFrom("");
+    setTransferTo("");
+    setTransferAmount("");
+    setTransferNotes("");
+    setTransferDate(new Date().toISOString().split("T")[0]);
+  };
+
   const handleAddTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     createTransactionMutation.mutate({
@@ -135,6 +170,17 @@ export default function CashBook() {
       amount: txAmount,
       notes: txNotes,
       transactionDate: txDate,
+    });
+  };
+
+  const handleTransfer = (e: React.FormEvent) => {
+    e.preventDefault();
+    createTransferMutation.mutate({
+      fromFundHolderId: transferFrom,
+      toFundHolderId: transferTo,
+      amount: transferAmount,
+      notes: transferNotes,
+      transactionDate: transferDate,
     });
   };
 
@@ -152,6 +198,34 @@ export default function CashBook() {
       day === 2 || day === 22 ? "nd" :
         day === 3 || day === 23 ? "rd" : "th";
     return `${day}${suffix} ${month}, ${year}`;
+  };
+
+  const isInflowType = (type: string) => type === "inflow" || type === "payment_collection" || type === "transfer_in";
+  const isOutflowType = (type: string) => type === "outflow" || type === "loan_disbursement" || type === "transfer_out";
+  const isTransferType = (type: string) => type === "transfer_in" || type === "transfer_out";
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case "loan_disbursement": return "Loan Given";
+      case "payment_collection": return "Payment Collected";
+      case "transfer_in": return "Transfer In";
+      case "transfer_out": return "Transfer Out";
+      default: return type;
+    }
+  };
+
+  const getIconColor = (type: string) => {
+    if (isTransferType(type)) return "bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400";
+    if (isInflowType(type)) return "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400";
+    if (type === "loan_disbursement") return "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400";
+    return "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400";
+  };
+
+  const getBadgeColor = (type: string) => {
+    if (isTransferType(type)) return "text-indigo-600 border-indigo-300";
+    if (isInflowType(type)) return "text-green-600 border-green-300";
+    if (type === "loan_disbursement") return "text-blue-600 border-blue-300";
+    return "text-red-600 border-red-300";
   };
 
   const totalCashOnHand = balances.reduce((sum, b) => sum + b.balance, 0);
@@ -173,6 +247,10 @@ export default function CashBook() {
           <Button size="sm" className="md:h-10 md:px-4 md:text-sm" variant="outline" onClick={() => setAddHolderOpen(true)}>
             <UserCircle className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden sm:inline">Add </span>Holder
+          </Button>
+          <Button size="sm" className="md:h-10 md:px-4 md:text-sm" variant="outline" onClick={() => setTransferOpen(true)} disabled={fundHolders.length < 2}>
+            <ArrowLeftRight className="h-4 w-4 mr-1 md:mr-2" />
+            Transfer
           </Button>
           <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setAddTransactionOpen(true)} disabled={fundHolders.length === 0}>
             <Plus className="h-4 w-4 mr-1 md:mr-2" />
@@ -247,15 +325,11 @@ export default function CashBook() {
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                          tx.type === "inflow" || tx.type === "payment_collection"
-                            ? "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400"
-                            : tx.type === "loan_disbursement"
-                              ? "bg-blue-100 text-blue-600 dark:bg-blue-950 dark:text-blue-400"
-                              : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"
-                        }`}
+                        className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${getIconColor(tx.type)}`}
                       >
-                        {tx.type === "inflow" || tx.type === "payment_collection" ? (
+                        {isTransferType(tx.type) ? (
+                          <ArrowLeftRight className="h-4 w-4" />
+                        ) : isInflowType(tx.type) ? (
                           <ArrowDownCircle className="h-4 w-4" />
                         ) : (
                           <ArrowUpCircle className="h-4 w-4" />
@@ -263,22 +337,19 @@ export default function CashBook() {
                       </div>
                       <div>
                         <p className="text-base font-semibold font-mono">
-                          {tx.type === "inflow" || tx.type === "payment_collection" ? "+" : "-"}{formatCurrency(tx.amount)}
+                          {isInflowType(tx.type) ? "+" : "-"}{formatCurrency(tx.amount)}
                         </p>
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <Badge
                             variant="outline"
-                            className={`text-[10px] ${
-                              tx.type === "inflow" || tx.type === "payment_collection"
-                                ? "text-green-600 border-green-300"
-                                : tx.type === "loan_disbursement"
-                                  ? "text-blue-600 border-blue-300"
-                                  : "text-red-600 border-red-300"
-                            }`}
+                            className={`text-[10px] ${getBadgeColor(tx.type)}`}
                           >
-                            {tx.type === "loan_disbursement" ? "Loan Given" : tx.type === "payment_collection" ? "Payment Collected" : tx.type}
+                            {getTypeLabel(tx.type)}
                           </Badge>
                           <span className="text-xs text-muted-foreground">{tx.fundHolderName}</span>
+                          {tx.paymentId && (
+                            <Badge variant="outline" className="text-[10px] text-muted-foreground border-muted-foreground/30">Linked</Badge>
+                          )}
                         </div>
                         {tx.notes && (
                           <p className="text-xs text-muted-foreground mt-0.5">{tx.notes}</p>
@@ -287,14 +358,16 @@ export default function CashBook() {
                     </div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs text-muted-foreground">{formatDate(tx.transactionDate)}</p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-red-600"
-                        onClick={() => setDeleteTransactionId(tx.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!tx.paymentId && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                          onClick={() => setDeleteTransactionId(tx.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -420,13 +493,103 @@ export default function CashBook() {
         </DialogContent>
       </Dialog>
 
+      {/* Transfer Dialog */}
+      <Dialog open={transferOpen} onOpenChange={(open) => { setTransferOpen(open); if (!open) resetTransferForm(); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transfer Funds</DialogTitle>
+            <DialogDescription>Transfer cash between fund holders</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleTransfer}>
+            <div className="space-y-3 py-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">From *</Label>
+                  <Select value={transferFrom} onValueChange={setTransferFrom}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fundHolders.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">To *</Label>
+                  <Select value={transferTo} onValueChange={setTransferTo}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {fundHolders
+                        .filter((h) => h.id !== transferFrom)
+                        .map((h) => (
+                          <SelectItem key={h.id} value={h.id}>{h.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Amount *</Label>
+                  <Input
+                    type="number"
+                    placeholder="10000"
+                    min="0.01"
+                    step="0.01"
+                    className="font-mono"
+                    value={transferAmount}
+                    onChange={(e) => setTransferAmount(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Date *</Label>
+                  <Input
+                    type="date"
+                    value={transferDate}
+                    onChange={(e) => setTransferDate(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Notes</Label>
+                <Textarea
+                  placeholder="e.g. Redistributing funds..."
+                  value={transferNotes}
+                  onChange={(e) => setTransferNotes(e.target.value)}
+                  className="h-20"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setTransferOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createTransferMutation.isPending || !transferFrom || !transferTo || !transferAmount}
+              >
+                {createTransferMutation.isPending ? "Transferring..." : "Transfer"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Transaction Confirmation */}
       <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone.
+              {transactions.find((t: any) => t.id === deleteTransactionId)?.transferGroupId
+                ? "This is a transfer. Both the outgoing and incoming legs will be deleted."
+                : "Are you sure you want to delete this transaction? This action cannot be undone."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

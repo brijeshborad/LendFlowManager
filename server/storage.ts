@@ -107,9 +107,13 @@ export interface IStorage {
 
   // Cash transaction operations
   getCashTransactions(userId: string, fundHolderId?: string): Promise<any[]>;
+  getCashTransaction(id: string, userId: string): Promise<CashTransaction | undefined>;
+  getCashTransactionByPaymentId(paymentId: string, userId: string): Promise<CashTransaction | undefined>;
   createCashTransaction(transaction: InsertCashTransaction): Promise<CashTransaction>;
   updateCashTransaction(id: string, userId: string, updates: { amount?: string; fundHolderId?: string; notes?: string; transactionDate?: Date }): Promise<CashTransaction>;
   deleteCashTransaction(id: string, userId: string): Promise<void>;
+  createTransfer(userId: string, fromFundHolderId: string, toFundHolderId: string, amount: string, notes: string | null, date: Date): Promise<{ transferOut: CashTransaction; transferIn: CashTransaction }>;
+  deleteTransferGroup(transferGroupId: string, userId: string): Promise<void>;
   getCashBalances(userId: string): Promise<{ fundHolderId: string; name: string; balance: number }[]>;
 }
 
@@ -255,10 +259,12 @@ export class DatabaseStorage implements IStorage {
         createdAt: payments.createdAt,
         updatedAt: payments.updatedAt,
         borrowerName: borrowers.name,
+        collectedByFundHolderId: cashTransactions.fundHolderId,
       })
       .from(payments)
       .innerJoin(loans, eq(payments.loanId, loans.id))
       .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
+      .leftJoin(cashTransactions, eq(cashTransactions.paymentId, payments.id))
       .where(and(...conditions))
       .orderBy(desc(payments.paymentDate));
   }
@@ -436,20 +442,28 @@ export class DatabaseStorage implements IStorage {
     activeBorrowers: number;
     cashOnHand?: number;
   }> {
-    // Single query for loan stats + active borrowers count
-    const [combinedStats, realTimeInterest] = await Promise.all([
+    // Separate queries to avoid JOIN inflation (LEFT JOIN payments duplicates loan rows)
+    const [loanStats, paymentStats, realTimeInterest] = await Promise.all([
       db.select({
         totalLent: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
-        activeBorrowers: sql<number>`COUNT(DISTINCT CASE WHEN ${borrowers.status} = 'active' THEN ${borrowers.id} END)`,
+        activeBorrowers: sql<number>`(SELECT COUNT(DISTINCT ${borrowers.id}) FROM ${borrowers} WHERE ${borrowers.userId} = ${userId} AND ${borrowers.status} = 'active')`,
+      })
+      .from(loans)
+      .where(eq(loans.userId, userId)),
+      db.select({
         principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
         interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
       })
-      .from(loans)
-      .innerJoin(borrowers, eq(loans.borrowerId, borrowers.id))
-      .leftJoin(payments, eq(loans.id, payments.loanId))
-      .where(eq(loans.userId, userId)),
+      .from(payments)
+      .where(eq(payments.userId, userId)),
       calculateRealTimeInterestForUser(userId),
     ]);
+    const combinedStats = [{
+      totalLent: loanStats[0]?.totalLent || 0,
+      activeBorrowers: loanStats[0]?.activeBorrowers || 0,
+      principalPaid: paymentStats[0]?.principalPaid || 0,
+      interestPaid: paymentStats[0]?.interestPaid || 0,
+    }];
 
     const totalInterestGenerated = realTimeInterest.reduce((sum, entry) => sum + entry.totalInterest, 0);
 
@@ -1048,6 +1062,8 @@ export class DatabaseStorage implements IStorage {
         type: cashTransactions.type,
         amount: cashTransactions.amount,
         loanId: cashTransactions.loanId,
+        paymentId: cashTransactions.paymentId,
+        transferGroupId: cashTransactions.transferGroupId,
         notes: cashTransactions.notes,
         transactionDate: cashTransactions.transactionDate,
         createdAt: cashTransactions.createdAt,
@@ -1056,6 +1072,22 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(fundHolders, eq(cashTransactions.fundHolderId, fundHolders.id))
       .where(and(...conditions))
       .orderBy(desc(cashTransactions.transactionDate));
+  }
+
+  async getCashTransaction(id: string, userId: string): Promise<CashTransaction | undefined> {
+    const [tx] = await db
+      .select()
+      .from(cashTransactions)
+      .where(and(eq(cashTransactions.id, id), eq(cashTransactions.userId, userId)));
+    return tx;
+  }
+
+  async getCashTransactionByPaymentId(paymentId: string, userId: string): Promise<CashTransaction | undefined> {
+    const [tx] = await db
+      .select()
+      .from(cashTransactions)
+      .where(and(eq(cashTransactions.paymentId, paymentId), eq(cashTransactions.userId, userId)));
+    return tx;
   }
 
   async createCashTransaction(transaction: InsertCashTransaction): Promise<CashTransaction> {
@@ -1083,6 +1115,40 @@ export class DatabaseStorage implements IStorage {
     await db.delete(cashTransactions).where(and(eq(cashTransactions.id, id), eq(cashTransactions.userId, userId)));
   }
 
+  async createTransfer(userId: string, fromFundHolderId: string, toFundHolderId: string, amount: string, notes: string | null, date: Date): Promise<{ transferOut: CashTransaction; transferIn: CashTransaction }> {
+    const transferGroupId = crypto.randomUUID();
+    const fromHolder = await db.select().from(fundHolders).where(eq(fundHolders.id, fromFundHolderId)).then(r => r[0]);
+    const toHolder = await db.select().from(fundHolders).where(eq(fundHolders.id, toFundHolderId)).then(r => r[0]);
+
+    const [transferOut] = await db.insert(cashTransactions).values({
+      userId,
+      fundHolderId: fromFundHolderId,
+      type: "transfer_out",
+      amount,
+      transferGroupId,
+      notes: notes || `Transfer to ${toHolder?.name || 'fund holder'}`,
+      transactionDate: date,
+    }).returning();
+
+    const [transferIn] = await db.insert(cashTransactions).values({
+      userId,
+      fundHolderId: toFundHolderId,
+      type: "transfer_in",
+      amount,
+      transferGroupId,
+      notes: notes || `Transfer from ${fromHolder?.name || 'fund holder'}`,
+      transactionDate: date,
+    }).returning();
+
+    return { transferOut, transferIn };
+  }
+
+  async deleteTransferGroup(transferGroupId: string, userId: string): Promise<void> {
+    await db.delete(cashTransactions).where(
+      and(eq(cashTransactions.transferGroupId, transferGroupId), eq(cashTransactions.userId, userId))
+    );
+  }
+
   async getCashBalances(userId: string): Promise<{ fundHolderId: string; name: string; balance: number }[]> {
     const holders = await this.getFundHolders(userId);
     const result = [];
@@ -1090,8 +1156,8 @@ export class DatabaseStorage implements IStorage {
     for (const holder of holders) {
       const [stats] = await db
         .select({
-          inflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('inflow', 'payment_collection') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
-          outflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('outflow', 'loan_disbursement') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          inflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('inflow', 'payment_collection', 'transfer_in') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          outflow: sql<number>`COALESCE(SUM(CASE WHEN ${cashTransactions.type} IN ('outflow', 'loan_disbursement', 'transfer_out') THEN CAST(${cashTransactions.amount} AS NUMERIC) ELSE 0 END), 0)`,
         })
         .from(cashTransactions)
         .where(and(eq(cashTransactions.userId, userId), eq(cashTransactions.fundHolderId, holder.id)));

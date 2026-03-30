@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -21,12 +21,12 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Payment } from "@shared/schema";
+import type { Payment, FundHolder } from "@shared/schema";
 
 interface EditPaymentModalProps {
   open: boolean;
   onClose: () => void;
-  payment: Payment | null;
+  payment: (Payment & { collectedByFundHolderId?: string | null }) | null;
 }
 
 export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalProps) {
@@ -38,6 +38,18 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
   const [transactionReference, setTransactionReference] = useState("");
   const [notes, setNotes] = useState("");
   const [interestClearedTillDate, setInterestClearedTillDate] = useState("");
+  const [collectedByFundHolderId, setCollectedByFundHolderId] = useState("");
+
+  const { data: userSettings } = useQuery<any>({
+    queryKey: ['/api/user/settings'],
+    enabled: open,
+  });
+  const { data: fundHolders = [] } = useQuery<FundHolder[]>({
+    queryKey: ['/api/fund-holders'],
+    enabled: open && userSettings?.cashTrackingEnabled,
+  });
+
+  const showCollectedBy = userSettings?.cashTrackingEnabled && fundHolders.length > 0;
 
   useEffect(() => {
     if (payment && open) {
@@ -48,10 +60,11 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
       setTransactionReference(payment.transactionReference || "");
       setNotes(payment.notes || "");
       setInterestClearedTillDate(
-        (payment as any).interestClearedTillDate 
+        (payment as any).interestClearedTillDate
           ? new Date((payment as any).interestClearedTillDate).toISOString().split('T')[0]
           : ""
       );
+      setCollectedByFundHolderId((payment as any).collectedByFundHolderId || "");
     }
   }, [payment, open]);
 
@@ -69,6 +82,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
       queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cash-transactions/balances'] });
       onClose();
     },
     onError: (error: any) => {
@@ -91,6 +106,7 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
       transactionReference: transactionReference || null,
       notes: notes || null,
       interestClearedTillDate: interestClearedTillDate || null,
+      collectedByFundHolderId: (collectedByFundHolderId && collectedByFundHolderId !== "none") ? collectedByFundHolderId : null,
     });
   };
 
@@ -141,8 +157,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
             <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="edit-payment-type" className="text-xs font-medium">Payment Type *</Label>
-              <Select 
-                value={paymentType} 
+              <Select
+                value={paymentType}
                 onValueChange={setPaymentType}
                 disabled={updatePaymentMutation.isPending}
               >
@@ -160,8 +176,8 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
 
             <div className="space-y-1.5">
               <Label htmlFor="edit-payment-method" className="text-xs font-medium">Payment Method *</Label>
-              <Select 
-                value={paymentMethod} 
+              <Select
+                value={paymentMethod}
                 onValueChange={setPaymentMethod}
                 disabled={updatePaymentMutation.isPending}
               >
@@ -202,6 +218,27 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
               </div>
             )}
 
+            {showCollectedBy && (
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium">Collected By (Fund Holder)</Label>
+                <Select
+                  value={collectedByFundHolderId}
+                  onValueChange={setCollectedByFundHolderId}
+                  disabled={updatePaymentMutation.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select fund holder (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {fundHolders.map((fh: FundHolder) => (
+                      <SelectItem key={fh.id} value={fh.id}>{fh.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <div className="space-y-1.5">
               <Label htmlFor="edit-notes" className="text-xs font-medium">Notes</Label>
               <Textarea
@@ -215,15 +252,15 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
           </div>
 
           <DialogFooter>
-            <Button 
-              type="button" 
-              variant="outline" 
+            <Button
+              type="button"
+              variant="outline"
               onClick={handleClose}
               disabled={updatePaymentMutation.isPending}
             >
               Cancel
             </Button>
-            <Button 
+            <Button
               type="submit"
               disabled={updatePaymentMutation.isPending}
             >

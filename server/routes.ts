@@ -540,7 +540,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             const payment = await storage.createPayment(validated);
 
-            // If cash tracking is enabled and a fund holder collected the payment, create a cash inflow
+            // If cash tracking is enabled and a fund holder collected the payment, create a cash inflow linked to this payment
             const { collectedByFundHolderId } = req.body;
             if (collectedByFundHolderId) {
                 const user = await storage.getUser(userId);
@@ -553,6 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
                         type: "payment_collection",
                         amount: validated.amount as string,
                         loanId: validated.loanId,
+                        paymentId: payment.id,
                         notes: `Payment collected from ${borrower?.name || 'borrower'} - ${validated.paymentType}`,
                         transactionDate: validated.paymentDate,
                     });
@@ -589,14 +590,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.patch("/api/payments/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
+            const { collectedByFundHolderId, ...rest } = req.body;
             // Convert date strings to Date objects if provided
             const updateData = {
-                ...req.body,
-                ...(req.body.paymentDate && { paymentDate: new Date(req.body.paymentDate) }),
-                ...(req.body.interestClearedTillDate && { interestClearedTillDate: new Date(req.body.interestClearedTillDate) })
+                ...rest,
+                ...(rest.paymentDate && { paymentDate: new Date(rest.paymentDate) }),
+                ...(rest.interestClearedTillDate && { interestClearedTillDate: new Date(rest.interestClearedTillDate) })
             };
 
             const payment = await storage.updatePayment(req.params.id, userId, updateData);
+
+            // Sync linked cash transaction
+            const existingCashTx = await storage.getCashTransactionByPaymentId(payment.id, userId);
+            if (existingCashTx && collectedByFundHolderId) {
+                // Update existing linked cash transaction
+                await storage.updateCashTransaction(existingCashTx.id, userId, {
+                    amount: payment.amount,
+                    fundHolderId: collectedByFundHolderId,
+                    transactionDate: payment.paymentDate,
+                });
+            } else if (existingCashTx && collectedByFundHolderId === null) {
+                // Fund holder removed — delete the linked cash transaction
+                await storage.deleteCashTransaction(existingCashTx.id, userId);
+            } else if (!existingCashTx && collectedByFundHolderId) {
+                // New fund holder assigned — create linked cash transaction
+                const user = await storage.getUser(userId);
+                if (user?.cashTrackingEnabled) {
+                    const loan = await storage.getLoan(payment.loanId, userId);
+                    const borrower = loan ? await storage.getBorrower(loan.borrowerId, userId) : null;
+                    await storage.createCashTransaction({
+                        userId,
+                        fundHolderId: collectedByFundHolderId,
+                        type: "payment_collection",
+                        amount: payment.amount,
+                        loanId: payment.loanId,
+                        paymentId: payment.id,
+                        notes: `Payment collected from ${borrower?.name || 'borrower'} - ${payment.paymentType}`,
+                        transactionDate: payment.paymentDate,
+                    });
+                }
+            }
 
             await storage.createAuditLog({
                 userId,
@@ -613,6 +646,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 data: payment,
             });
 
+            // Notify frontend to refresh cash data
+            broadcastToUser(userId, {
+                type: "cash_transaction_updated",
+            });
+
             res.json(payment);
         } catch (error: any) {
             console.error("Error updating payment:", error);
@@ -623,6 +661,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.delete("/api/payments/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
+            // Cascade will auto-delete linked cash transaction via DB FK
             await storage.deletePayment(req.params.id, userId);
 
             await storage.createAuditLog({
@@ -637,6 +676,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             broadcastToUser(userId, {
                 type: "payment_deleted",
                 data: {id: req.params.id},
+            });
+
+            // Notify frontend to refresh cash data (linked cash tx was cascade-deleted)
+            broadcastToUser(userId, {
+                type: "cash_transaction_updated",
             });
 
             res.status(204).send();
@@ -1047,9 +1091,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    // Transfer endpoint — must be registered before :id routes
+    app.post("/api/cash-transactions/transfer", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const { fromFundHolderId, toFundHolderId, amount, notes, transactionDate } = req.body;
+
+            if (!fromFundHolderId || !toFundHolderId || !amount) {
+                return res.status(400).json({ message: "fromFundHolderId, toFundHolderId, and amount are required" });
+            }
+            if (fromFundHolderId === toFundHolderId) {
+                return res.status(400).json({ message: "Cannot transfer to the same fund holder" });
+            }
+
+            const date = transactionDate ? new Date(transactionDate) : new Date();
+            const result = await storage.createTransfer(userId, fromFundHolderId, toFundHolderId, amount, notes || null, date);
+
+            await storage.createAuditLog({
+                userId,
+                action: "create_transfer",
+                entityType: "cash_transaction",
+                entityId: result.transferOut.id,
+                changes: { fromFundHolderId, toFundHolderId, amount, transferGroupId: result.transferOut.transferGroupId },
+                ipAddress: req.ip,
+                userAgent: req.get("user-agent"),
+            });
+
+            broadcastToUser(userId, { type: "cash_transaction_updated" });
+
+            res.status(201).json(result);
+        } catch (error: any) {
+            console.error("Error creating transfer:", error);
+            res.status(400).json({ message: error.message || "Failed to create transfer" });
+        }
+    });
+
     app.patch("/api/cash-transactions/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
+
+            // Protect payment-linked transactions
+            const existing = await storage.getCashTransaction(req.params.id, userId);
+            if (existing?.paymentId) {
+                return res.status(400).json({ message: "This transaction is linked to a payment. Edit the payment instead." });
+            }
+
             const { amount, fundHolderId, notes, transactionDate } = req.body;
             const updates: { amount?: string; fundHolderId?: string; notes?: string; transactionDate?: Date } = {};
             if (amount !== undefined) updates.amount = amount;
@@ -1079,7 +1165,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.delete("/api/cash-transactions/:id", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
-            await storage.deleteCashTransaction(req.params.id, userId);
+
+            const existing = await storage.getCashTransaction(req.params.id, userId);
+            if (!existing) {
+                return res.status(404).json({ message: "Cash transaction not found" });
+            }
+
+            // Protect payment-linked transactions
+            if (existing.paymentId) {
+                return res.status(400).json({ message: "This transaction is linked to a payment. Delete the payment instead." });
+            }
+
+            // If part of a transfer, delete both legs
+            if (existing.transferGroupId) {
+                await storage.deleteTransferGroup(existing.transferGroupId, userId);
+            } else {
+                await storage.deleteCashTransaction(req.params.id, userId);
+            }
+
+            broadcastToUser(userId, { type: "cash_transaction_updated" });
+
             res.status(204).send();
         } catch (error: any) {
             console.error("Error deleting cash transaction:", error);
