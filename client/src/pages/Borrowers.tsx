@@ -41,6 +41,8 @@ export default function Borrowers() {
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [deleteLoanDialogOpen, setDeleteLoanDialogOpen] = useState(false);
   const [selectedLoanForDelete, setSelectedLoanForDelete] = useState<Loan | null>(null);
+  const [deleteBorrowerDialogOpen, setDeleteBorrowerDialogOpen] = useState(false);
+  const [selectedBorrowerForDelete, setSelectedBorrowerForDelete] = useState<Borrower | null>(null);
   const [, setLocation] = useLocation();
   const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
 
@@ -107,6 +109,44 @@ export default function Borrowers() {
       });
     },
   });
+
+  const deleteBorrowerMutation = useMutation({
+    mutationFn: async (borrowerId: string) => {
+      await apiRequest("DELETE", `/api/borrowers/${borrowerId}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Borrower and all linked data deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/borrowers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/loans'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/payments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/dashboard/stats'] });
+      setDeleteBorrowerDialogOpen(false);
+      setSelectedBorrowerForDelete(null);
+      setSelectedBorrowerId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete borrower",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteBorrower = (borrower: Borrower, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedBorrowerForDelete(borrower);
+    setDeleteBorrowerDialogOpen(true);
+  };
+
+  const confirmDeleteBorrower = () => {
+    if (selectedBorrowerForDelete) {
+      deleteBorrowerMutation.mutate(selectedBorrowerForDelete.id);
+    }
+  };
 
   const handleDeleteLoan = (loan: Loan, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -230,6 +270,21 @@ export default function Borrowers() {
               <Plus className="h-4 w-4 mr-1 md:mr-2" />
               Payment
             </Button>
+            <TooltipProvider delayDuration={0}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="md:h-10 md:w-10 text-muted-foreground hover:text-red-600"
+                    onClick={(e) => handleDeleteBorrower(selectedBorrower, e)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete Borrower</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         
@@ -567,6 +622,22 @@ export default function Borrowers() {
                       <h3 className="font-semibold truncate" data-testid={`text-borrower-name-${borrower.id}`}>
                         {borrower.name}
                       </h3>
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider delayDuration={0}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                onClick={(e) => handleDeleteBorrower(borrower, e)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete Borrower</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       <Badge
                         variant={
                           borrower.status === 'active' ? 'default' :
@@ -578,6 +649,7 @@ export default function Borrowers() {
                       >
                         {borrower.status}
                       </Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -606,6 +678,48 @@ export default function Borrowers() {
       )}
 
       <AddBorrowerModal open={addModalOpen} onClose={() => setAddModalOpen(false)} />
+
+      <AlertDialog open={deleteBorrowerDialogOpen} onOpenChange={setDeleteBorrowerDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Borrower</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Are you sure you want to delete <span className="font-semibold text-foreground">{selectedBorrowerForDelete?.name}</span>?
+                </p>
+                {selectedBorrowerForDelete && (() => {
+                  const linkedLoans = loans.filter((l: any) => l.borrowerId === selectedBorrowerForDelete.id);
+                  const linkedPayments = payments.filter((p: any) => linkedLoans.some((l: any) => l.id === p.loanId));
+                  if (linkedLoans.length > 0) {
+                    return (
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm space-y-1">
+                        <p className="font-medium text-destructive">This will permanently delete:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
+                          <li>{linkedLoans.length} loan{linkedLoans.length > 1 ? 's' : ''} ({linkedLoans.filter((l: any) => l.status === 'active').length} active)</li>
+                          <li>{linkedPayments.length} payment transaction{linkedPayments.length !== 1 ? 's' : ''}</li>
+                          <li>All associated interest entries and reminders</li>
+                        </ul>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteBorrower}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Borrower
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
