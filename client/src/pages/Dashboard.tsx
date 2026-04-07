@@ -360,14 +360,14 @@ export default function Dashboard() {
             )}
             <SummaryCard
               title="Total Amount Lent"
-              value={stats?.totalLent || "₹0"}
+              value={formatCurrency(stats?.totalLent || 0)}
               subValue="All time"
               icon={LucideIndianRupee}
               iconColor="bg-blue-500"
             />
             <SummaryCard
               title="Outstanding Principal"
-              value={stats?.totalOutstanding || "₹0"}
+              value={formatCurrency(stats?.totalOutstanding || 0)}
               icon={Banknote}
               iconColor="bg-orange-500"
             />
@@ -375,13 +375,13 @@ export default function Dashboard() {
               title="Interest Collected"
               value={formatCurrency(payments
                 .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-                .reduce((sum, p) => sum + parseFloat(p.amount), 0)) || "₹0"}
+                .reduce((sum, p) => sum + parseFloat(p.amount), 0))}
               icon={TrendingUp}
               iconColor="bg-emerald-500"
             />
             <SummaryCard
               title="Pending Interest"
-              value={stats?.totalPendingInterest || "₹0"}
+              value={formatCurrency(stats?.totalPendingInterest || 0)}
               icon={TrendingUp}
               iconColor="bg-red-500"
             />

@@ -254,6 +254,7 @@ export function AddLoanModal({ open, onClose }: AddLoanModalProps) {
                   id="start-date"
                   type="date"
                   required
+                  className="h-10"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   data-testid="input-start-date"

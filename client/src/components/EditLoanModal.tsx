@@ -163,6 +163,7 @@ export function EditLoanModal({ open, onClose, loan }: EditLoanModalProps) {
                   id="edit-start-date"
                   type="date"
                   required
+                  className="h-10"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   disabled={updateLoanMutation.isPending}

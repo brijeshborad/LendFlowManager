@@ -147,6 +147,7 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
                   id="edit-payment-date"
                   type="date"
                   required
+                  className="h-10"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
                   disabled={updatePaymentMutation.isPending}
@@ -211,6 +212,7 @@ export function EditPaymentModal({ open, onClose, payment }: EditPaymentModalPro
                   id="edit-interest-cleared-till"
                   type="date"
                   required
+                  className="h-10"
                   value={interestClearedTillDate}
                   onChange={(e) => setInterestClearedTillDate(e.target.value)}
                   disabled={updatePaymentMutation.isPending}

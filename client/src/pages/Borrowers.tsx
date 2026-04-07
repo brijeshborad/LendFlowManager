@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { UserPlus, Mail, Phone, MapPin, ArrowLeft, Plus, Edit, Trash2, MoreHorizontal, Wallet, TrendingUp } from "lucide-react";
+import { UserPlus, Mail, Phone, MapPin, ArrowLeft, Plus, Edit, Trash2, MoreHorizontal, Wallet, TrendingUp, FileDown } from "lucide-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -29,7 +29,12 @@ import { AddPaymentModal } from "@/components/AddPaymentModal";
 import { EditPaymentModal } from "@/components/EditPaymentModal";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { Borrower, Loan, Payment } from "@shared/schema";
+import { generateLoanStatementPdf } from "@/lib/generateStatementPdf";
 
 export default function Borrowers() {
   const { toast } = useToast();
@@ -45,6 +50,13 @@ export default function Borrowers() {
   const [selectedBorrowerForDelete, setSelectedBorrowerForDelete] = useState<Borrower | null>(null);
   const [, setLocation] = useLocation();
   const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfLoanSelection, setPdfLoanSelection] = useState<string>("all");
+  const [pdfTillDate, setPdfTillDate] = useState(() => {
+    const now = new Date();
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+    return lastMonthEnd.toISOString().split('T')[0];
+  });
 
   const { data: borrowers = [], isLoading } = useQuery<Borrower[]>({
     queryKey: ['/api/borrowers'],
@@ -175,7 +187,19 @@ export default function Borrowers() {
       deletePaymentMutation.mutate(selectedPayment.id);
     }
   };
-  
+
+  const handleDownloadBorrowerPdf = async () => {
+    if (!selectedBorrowerId) return;
+    try {
+      const response = await apiRequest("GET", `/api/reports/borrower-report?borrowerId=${selectedBorrowerId}&tillDate=${pdfTillDate}`);
+      const reportData = await response.json();
+      generateLoanStatementPdf(reportData, pdfLoanSelection === "all" ? undefined : pdfLoanSelection);
+      setPdfDialogOpen(false);
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to generate PDF", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
@@ -262,6 +286,13 @@ export default function Borrowers() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => {
+              setPdfLoanSelection("all");
+              setPdfDialogOpen(true);
+            }} variant="outline">
+              <FileDown className="h-4 w-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">PDF </span>Statement
+            </Button>
             <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setAddLoanModalOpen(true)} variant="outline">
               <Plus className="h-4 w-4 mr-1 md:mr-2" />
               <span className="hidden sm:inline">Create </span>Loan
@@ -569,10 +600,57 @@ export default function Borrowers() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* PDF Statement Dialog */}
+        <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Download PDF Statement</DialogTitle>
+              <DialogDescription>
+                Generate interest statement for {selectedBorrower.name}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-1.5">
+                <Label>Statement Till Date</Label>
+                <Input
+                  type="date"
+                  value={pdfTillDate}
+                  onChange={(e) => setPdfTillDate(e.target.value)}
+                />
+              </div>
+              {borrowerLoans.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label>Loans</Label>
+                  <Select value={pdfLoanSelection} onValueChange={setPdfLoanSelection}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select loans" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Loans ({borrowerLoans.length})</SelectItem>
+                      {borrowerLoans.map((loan: any) => (
+                        <SelectItem key={loan.id} value={loan.id}>
+                          {formatCurrency(loan.principalAmount)} @ {loan.interestRate}% ({loan.status})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPdfDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleDownloadBorrowerPdf} disabled={!pdfTillDate}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
-  
+
   return (
     <div className="p-4 md:p-8 space-y-4 md:space-y-6">
       <div className="flex items-center justify-between gap-3">

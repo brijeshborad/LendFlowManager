@@ -831,6 +831,20 @@ export class DatabaseStorage implements IStorage {
       return `${day}${suffix} ${month}, ${year}`;
     }
     
+    // Build payment history per loan
+    const paymentHistory = borrowerPayments
+      .map(p => ({
+        loanId: p.payments.loanId,
+        paymentDate: p.payments.paymentDate,
+        amount: parseFloat(p.payments.amount.toString()),
+        paymentType: p.payments.paymentType,
+        paymentMethod: p.payments.paymentMethod,
+        interestClearedTillDate: p.payments.interestClearedTillDate,
+        transactionReference: p.payments.transactionReference,
+        notes: p.payments.notes,
+      }))
+      .sort((a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime());
+
     return {
       borrowerName: borrower.name,
       tillDate: tillDate.toISOString(),
@@ -839,7 +853,8 @@ export class DatabaseStorage implements IStorage {
       totalInterestPaid: parseFloat(totalInterestPaid.toFixed(2)),
       totalPendingInterest: parseFloat((totalInterestGenerated - totalInterestPaid).toFixed(2)),
       loanDetails,
-      monthlyBreakdown
+      monthlyBreakdown,
+      paymentHistory,
     };
   }
 

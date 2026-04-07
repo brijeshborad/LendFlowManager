@@ -213,6 +213,7 @@ export function AddPaymentModal({
                                     name="payment-date"
                                     type="date"
                                     required
+                                    className="h-10"
                                     data-testid="input-payment-date"
                                 />
                             </div>
@@ -300,6 +301,7 @@ export function AddPaymentModal({
                                     name="interest-cleared-till"
                                     type="date"
                                     required
+                                    className="h-10"
                                     min={minInterestClearedTillDate || undefined}
                                     data-testid="input-interest-cleared-till"
                                 />

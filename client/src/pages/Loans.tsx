@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react";
 import {useMutation, useQuery} from "@tanstack/react-query";
-import {ArrowLeft, Calendar, CheckCircle, Edit, MoreHorizontal, Plus, Trash2, TrendingUp, Wallet, Banknote} from "lucide-react";
+import {ArrowLeft, Calendar, CheckCircle, Edit, MoreHorizontal, Plus, Trash2, TrendingUp, Wallet, Banknote, FileDown} from "lucide-react";
 import {useLocation} from "wouter";
 import {Button} from "@/components/ui/button";
 import {Card, CardContent, CardHeader} from "@/components/ui/card";
@@ -30,6 +30,7 @@ import {CloseLoanDialog} from "@/components/CloseLoanDialog";
 import {useToast} from "@/hooks/use-toast";
 import {apiRequest, queryClient} from "@/lib/queryClient";
 import {Borrower, Loan, Payment, FundHolder} from "@shared/schema";
+import {generateLoanStatementPdf} from "@/lib/generateStatementPdf";
 
 export default function Loans() {
     const {toast} = useToast();
@@ -44,6 +45,13 @@ export default function Loans() {
     const [closeLoanDialogOpen, setCloseLoanDialogOpen] = useState(false);
     const [addFundSourceOpen, setAddFundSourceOpen] = useState(false);
     const [editFundSourceOpen, setEditFundSourceOpen] = useState(false);
+    const [pdfDateDialogOpen, setPdfDateDialogOpen] = useState(false);
+    const [pdfTillDate, setPdfTillDate] = useState(() => {
+        const now = new Date();
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        return lastMonthEnd.toISOString().split('T')[0];
+    });
+    const [pdfTargetLoan, setPdfTargetLoan] = useState<Loan | null>(null);
     const [editingFundSource, setEditingFundSource] = useState<any>(null);
     const [fundSourceHolderId, setFundSourceHolderId] = useState("");
     const [, setLocation] = useLocation();
@@ -252,6 +260,23 @@ export default function Loans() {
         window.history.pushState({}, '', `/loans?id=${loanId}`);
     };
 
+    const handleDownloadLoanPdf = (loan: Loan) => {
+        setPdfTargetLoan(loan);
+        setPdfDateDialogOpen(true);
+    };
+
+    const confirmDownloadLoanPdf = async () => {
+        if (!pdfTargetLoan) return;
+        try {
+            const response = await apiRequest("GET", `/api/reports/borrower-report?borrowerId=${pdfTargetLoan.borrowerId}&tillDate=${pdfTillDate}`);
+            const reportData = await response.json();
+            generateLoanStatementPdf(reportData, pdfTargetLoan.id);
+            setPdfDateDialogOpen(false);
+        } catch (error) {
+            toast({title: "Error", description: "Failed to generate PDF", variant: "destructive"});
+        }
+    };
+
     if (selectedLoan) {
         const totalPaid = loanPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
         const interestGenerated = loanInterest?.totalInterest || 0;
@@ -284,6 +309,10 @@ export default function Loans() {
 
                             {/* Large screens: show all buttons inline */}
                             <div className="hidden lg:flex gap-2">
+                                <Button size="sm" onClick={() => handleDownloadLoanPdf(selectedLoan)} variant="outline">
+                                    <FileDown className="h-4 w-4 mr-1"/>
+                                    PDF Statement
+                                </Button>
                                 {selectedLoan.status !== "closed" && (
                                     <Button size="sm" onClick={() => setCloseLoanDialogOpen(true)} variant="outline"
                                             className="text-amber-600 hover:text-amber-700 hover:bg-amber-50">
@@ -311,6 +340,10 @@ export default function Loans() {
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => handleDownloadLoanPdf(selectedLoan)}>
+                                            <FileDown className="h-4 w-4 mr-2"/>
+                                            PDF Statement
+                                        </DropdownMenuItem>
                                         {selectedLoan.status !== "closed" && (
                                             <DropdownMenuItem onClick={() => setCloseLoanDialogOpen(true)} className="text-amber-600">
                                                 <CheckCircle className="h-4 w-4 mr-2"/>
@@ -799,6 +832,35 @@ export default function Loans() {
                         </AlertDialogFooter>
                     </AlertDialogContent>
                 </AlertDialog>
+
+                {/* PDF Date Picker Dialog */}
+                <Dialog open={pdfDateDialogOpen} onOpenChange={setPdfDateDialogOpen}>
+                    <DialogContent className="max-w-xs">
+                        <DialogHeader>
+                            <DialogTitle>Generate PDF Statement</DialogTitle>
+                            <DialogDescription>
+                                Select the date till which the statement should be generated
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Label htmlFor="pdfTillDate">Statement Till Date</Label>
+                            <Input
+                                id="pdfTillDate"
+                                type="date"
+                                value={pdfTillDate}
+                                onChange={(e) => setPdfTillDate(e.target.value)}
+                                className="mt-1.5"
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setPdfDateDialogOpen(false)}>Cancel</Button>
+                            <Button onClick={confirmDownloadLoanPdf} disabled={!pdfTillDate}>
+                                <FileDown className="h-4 w-4 mr-2"/>
+                                Download PDF
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         );
     }
