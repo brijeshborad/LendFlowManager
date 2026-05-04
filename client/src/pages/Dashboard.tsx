@@ -1,724 +1,755 @@
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { LucideIndianRupee, TrendingUp, Users, Banknote, Plus, UserPlus, PieChart as PieChartIcon, HandCoins } from "lucide-react";
-import { SummaryCard } from "@/components/SummaryCard";
-import { BorrowerCard } from "@/components/BorrowerCard";
-import { InterestChart } from "@/components/InterestChart";
-import { ActivityFeed } from "@/components/ActivityFeed";
-import { AddPaymentModal } from "@/components/AddPaymentModal";
-import { AddBorrowerModal } from "@/components/AddBorrowerModal";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Skeleton } from "@/components/ui/skeleton";
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid } from "recharts";
-import type { Borrower, Loan, Payment } from "@shared/schema";
+import {useState, useMemo} from "react";
+import {useQuery} from "@tanstack/react-query";
+import {
+    LucideIndianRupee,
+    TrendingUp,
+    Users,
+    Banknote,
+    Plus,
+    UserPlus,
+    PieChart as PieChartIcon,
+    HandCoins
+} from "lucide-react";
+import {SummaryCard} from "@/components/SummaryCard";
+import {BorrowerCard} from "@/components/BorrowerCard";
+import {InterestChart} from "@/components/InterestChart";
+import {ActivityFeed} from "@/components/ActivityFeed";
+import {AddPaymentModal} from "@/components/AddPaymentModal";
+import {AddBorrowerModal} from "@/components/AddBorrowerModal";
+import {Button} from "@/components/ui/button";
+import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
+import {Tabs, TabsContent, TabsList, TabsTrigger} from "@/components/ui/tabs";
+import {Skeleton} from "@/components/ui/skeleton";
+import {
+    PieChart,
+    Pie,
+    Cell,
+    ResponsiveContainer,
+    Legend,
+    Tooltip,
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid
+} from "recharts";
+import type {Borrower, Loan, Payment} from "@shared/schema";
 import avatar1 from '@assets/generated_images/Professional_male_avatar_headshot_3c69c06f.png';
 import avatar2 from '@assets/generated_images/Professional_female_avatar_headshot_d7c69081.png';
 import avatar3 from '@assets/generated_images/Professional_diverse_avatar_headshot_7572a5aa.png';
 
 interface DashboardStats {
-  totalLent: number;
-  totalOutstanding: number;
-  totalPendingInterest: number;
-  activeBorrowers: number;
-  cashOnHand?: number;
+    totalLent: number;
+    totalOutstanding: number;
+    totalPendingInterest: number;
+    activeBorrowers: number;
+    cashOnHand?: number;
 }
 
 export default function Dashboard() {
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [borrowerModalOpen, setBorrowerModalOpen] = useState(false);
-  const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
+    const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [borrowerModalOpen, setBorrowerModalOpen] = useState(false);
+    const [selectedBorrowerId, setSelectedBorrowerId] = useState<string | null>(null);
 
-  // Fetch dashboard stats
-  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/dashboard/stats'],
-    staleTime: 30000, // 30 seconds
-  });
-
-  // Fetch borrowers
-  const { data: borrowers = [], isLoading: borrowersLoading } = useQuery<Borrower[]>({
-    queryKey: ['/api/borrowers'],
-    staleTime: 60000, // 1 minute
-  });
-
-  // Fetch real-time interest data
-  const { data: realTimeInterest = [] } = useQuery({
-    queryKey: ['/api/interest/real-time'],
-    staleTime: 30000, // 30 seconds
-  });
-
-  // Fetch all loans
-  const { data: loans = [] } = useQuery<Loan[]>({
-    queryKey: ['/api/loans'],
-    staleTime: 60000, // 1 minute
-  });
-
-  // Fetch all payments
-  const { data: payments = [] } = useQuery<Payment[]>({
-    queryKey: ['/api/payments'],
-    staleTime: 30000, // 30 seconds
-  });
-
-  const [chartTimeRange, setChartTimeRange] = useState(6);
-
-  // Generate dynamic chart data based on selected time range
-  const chartData = useMemo(() => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const months: { [key: string]: { received: number; pending: number } } = {};
-    
-    // Initialize months based on time range
-    const today = new Date();
-    for (let i = chartTimeRange - 1; i >= 0; i--) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
-      months[key] = { received: 0, pending: 0 };
-    }
-
-    // Aggregate payments by month and year
-    payments.forEach(payment => {
-      const paymentDate = new Date(payment.paymentDate);
-      const monthKey = `${monthNames[paymentDate.getMonth()]} ${paymentDate.getFullYear()}`;
-      if (months[monthKey]) {
-        months[monthKey].received += parseFloat(payment.amount);
-      }
+    // Fetch dashboard stats
+    const {data: stats, isLoading: statsLoading} = useQuery<DashboardStats>({
+        queryKey: ['/api/dashboard/stats'],
+        staleTime: 30000, // 30 seconds
     });
 
-    // Calculate actual pending interest for each month (using 30-day month standard)
-    Object.keys(months).forEach(monthKey => {
-      const [monthName, year] = monthKey.split(' ');
-      const monthIndex = monthNames.indexOf(monthName);
-      const monthDate = new Date(parseInt(year), monthIndex, 1);
-      
-      // Calculate pending interest for active loans in that month
-      const pendingForMonth = loans
-        .filter(loan => {
-          const loanStart = new Date(loan.startDate);
-          return loanStart <= monthDate && loan.status === 'active';
-        })
-        .reduce((sum, loan) => {
-          const principal = parseFloat(loan.principalAmount);
-          const monthlyRate = parseFloat(loan.interestRate) / 100;
-          return sum + (principal * monthlyRate); // Standard monthly calculation
-        }, 0);
-      
-      months[monthKey].pending = Math.round(pendingForMonth);
-    });
-    
-    return Object.entries(months).map(([month, data]) => ({
-      month: month.split(' ')[0], // Show only month name
-      received: Math.round(data.received),
-      pending: data.pending,
-    }));
-  }, [payments, loans, chartTimeRange]);
-
-  // Generate dynamic activity feed from recent payments and loans
-  const activities = useMemo(() => {
-    const allActivities: Array<{
-      id: string;
-      type: 'payment' | 'alert' | 'reminder' | 'system';
-      title: string;
-      description: string;
-      amount?: string;
-      timestamp: string;
-    }> = [];
-
-    // Add recent payments
-    const sortedPayments = [...payments]
-      .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
-      .slice(0, 5);
-
-    sortedPayments.forEach(payment => {
-      const loan = loans.find(l => l.id === payment.loanId);
-      const borrower = borrowers.find(b => b.id === loan?.borrowerId);
-      
-      const timeAgo = getTimeAgo(new Date(payment.paymentDate));
-      
-      allActivities.push({
-        id: payment.id,
-        type: 'payment',
-        title: `Payment Received - ${borrower?.name || 'Unknown'}`,
-        description: `${payment.paymentType} payment via ${payment.paymentMethod}`,
-        amount: `₹${parseFloat(payment.amount).toLocaleString('en-IN')}`,
-        timestamp: timeAgo,
-      });
+    // Fetch borrowers
+    const {data: borrowers = [], isLoading: borrowersLoading} = useQuery<Borrower[]>({
+        queryKey: ['/api/borrowers'],
+        staleTime: 60000, // 1 minute
     });
 
-    // Add recent loans
-    const sortedLoans = [...loans]
-      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
-      .slice(0, 3);
-
-    sortedLoans.forEach(loan => {
-      const borrower = borrowers.find(b => b.id === loan.borrowerId);
-      const createdDate = loan.createdAt ? new Date(loan.createdAt) : new Date();
-      const timeAgo = getTimeAgo(createdDate);
-      
-      allActivities.push({
-        id: loan.id,
-        type: 'system',
-        title: `New Loan Created - ${borrower?.name || 'Unknown'}`,
-        description: `Principal amount at ${loan.interestRate}% interest`,
-        amount: `₹${parseFloat(loan.principalAmount).toLocaleString('en-IN')}`,
-        timestamp: timeAgo,
-      });
+    // Fetch real-time interest data
+    const {data: realTimeInterest = []} = useQuery({
+        queryKey: ['/api/interest/real-time'],
+        staleTime: 30000, // 30 seconds
     });
 
-    // Sort all activities by most recent
-    return allActivities
-      .sort((a, b) => {
-        const timeA = parseTimeAgo(a.timestamp);
-        const timeB = parseTimeAgo(b.timestamp);
-        return timeA - timeB;
-      })
-      .slice(0, 8);
-  }, [payments, loans, borrowers]);
+    // Fetch all loans
+    const {data: loans = []} = useQuery<Loan[]>({
+        queryKey: ['/api/loans'],
+        staleTime: 60000, // 1 minute
+    });
 
-  // Calculate loan status distribution for pie chart
-  const loanStatusData = useMemo(() => {
-    const statusCounts = loans.reduce((acc, loan) => {
-      const status = loan.status || 'active';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    // Fetch all payments
+    const {data: payments = []} = useQuery<Payment[]>({
+        queryKey: ['/api/payments'],
+        staleTime: 30000, // 30 seconds
+    });
 
-    return Object.entries(statusCounts).map(([status, count]) => ({
-      name: status.charAt(0).toUpperCase() + status.slice(1),
-      value: count,
-      color: status === 'active' ? '#3B82F6' : status === 'settled' ? '#10B981' : '#EF4444',
-    }));
-  }, [loans]);
+    const [chartTimeRange, setChartTimeRange] = useState(6);
 
-  // Calculate monthly interest earned for area chart
-  const monthlyInterestData = useMemo(() => {
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const months: { [key: string]: { earned: number; collected: number; pending: number } } = {};
-    
-    // Initialize last 6 months
-    const today = new Date();
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
-      const key = `${monthNames[date.getMonth()]}`;
-      months[key] = { earned: 0, collected: 0, pending: 0 };
-    }
+    // Generate dynamic chart data based on selected time range
+    const chartData = useMemo(() => {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months: { [key: string]: { received: number; pending: number } } = {};
 
-    // Calculate interest earned for each loan by month (using 30-day month standard)
-    loans.forEach(loan => {
-      const startDate = new Date(loan.startDate);
-      const interestRate = parseFloat(loan.interestRate) / 100;
-      const principal = parseFloat(loan.principalAmount);
-      
-      Object.keys(months).forEach(monthKey => {
-        const monthIndex = monthNames.indexOf(monthKey);
-        const monthDate = new Date(today.getFullYear(), monthIndex, 1);
-        
-        if (monthDate >= startDate && loan.status === 'active') {
-          const monthlyInterest = principal * interestRate; // Standard monthly calculation
-          months[monthKey].earned += monthlyInterest;
+        // Initialize months based on time range
+        const today = new Date();
+        for (let i = chartTimeRange - 1; i >= 0; i--) {
+            const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const key = `${monthNames[date.getMonth()]} ${date.getFullYear()}`;
+            months[key] = {received: 0, pending: 0};
         }
-      });
-    });
 
-    // Calculate interest payments collected by month
-    payments
-      .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-      .forEach(payment => {
-        const paymentDate = new Date(payment.paymentDate);
-        const monthKey = monthNames[paymentDate.getMonth()];
-        if (months[monthKey]) {
-          months[monthKey].collected += parseFloat(payment.amount);
+        // Aggregate payments by month and year
+        payments.forEach(payment => {
+            const paymentDate = new Date(payment.paymentDate);
+            const monthKey = `${monthNames[paymentDate.getMonth()]} ${paymentDate.getFullYear()}`;
+            if (months[monthKey]) {
+                months[monthKey].received += parseFloat(payment.amount);
+            }
+        });
+
+        // Calculate actual pending interest for each month (using 30-day month standard)
+        Object.keys(months).forEach(monthKey => {
+            const [monthName, year] = monthKey.split(' ');
+            const monthIndex = monthNames.indexOf(monthName);
+            const monthDate = new Date(parseInt(year), monthIndex, 1);
+
+            // Calculate pending interest for active loans in that month
+            const pendingForMonth = loans
+                .filter(loan => {
+                    const loanStart = new Date(loan.startDate);
+                    return loanStart <= monthDate && loan.status === 'active';
+                })
+                .reduce((sum, loan) => {
+                    const principal = parseFloat(loan.principalAmount);
+                    const monthlyRate = parseFloat(loan.interestRate) / 100;
+                    return sum + (principal * monthlyRate); // Standard monthly calculation
+                }, 0);
+
+            months[monthKey].pending = Math.round(pendingForMonth);
+        });
+
+        return Object.entries(months).map(([month, data]) => ({
+            month: month.split(' ')[0], // Show only month name
+            received: Math.round(data.received),
+            pending: data.pending,
+        }));
+    }, [payments, loans, chartTimeRange]);
+
+    // Generate dynamic activity feed from recent payments and loans
+    const activities = useMemo(() => {
+        const allActivities: Array<{
+            id: string;
+            type: 'payment' | 'alert' | 'reminder' | 'system';
+            title: string;
+            description: string;
+            amount?: string;
+            timestamp: string;
+        }> = [];
+
+        // Add recent payments
+        const sortedPayments = [...payments]
+            .sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())
+            .slice(0, 5);
+
+        sortedPayments.forEach(payment => {
+            const loan = loans.find(l => l.id === payment.loanId);
+            const borrower = borrowers.find(b => b.id === loan?.borrowerId);
+
+            const timeAgo = getTimeAgo(new Date(payment.paymentDate));
+
+            allActivities.push({
+                id: payment.id,
+                type: 'payment',
+                title: `Payment Received - ${borrower?.name || 'Unknown'}`,
+                description: `${payment.paymentType} payment via ${payment.paymentMethod}`,
+                amount: `₹${parseFloat(payment.amount).toLocaleString('en-IN')}`,
+                timestamp: timeAgo,
+            });
+        });
+
+        // Add recent loans
+        const sortedLoans = [...loans]
+            .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
+            .slice(0, 3);
+
+        sortedLoans.forEach(loan => {
+            const borrower = borrowers.find(b => b.id === loan.borrowerId);
+            const createdDate = loan.createdAt ? new Date(loan.createdAt) : new Date();
+            const timeAgo = getTimeAgo(createdDate);
+
+            allActivities.push({
+                id: loan.id,
+                type: 'system',
+                title: `New Loan Created - ${borrower?.name || 'Unknown'}`,
+                description: `Principal amount at ${loan.interestRate}% interest`,
+                amount: `₹${parseFloat(loan.principalAmount).toLocaleString('en-IN')}`,
+                timestamp: timeAgo,
+            });
+        });
+
+        // Sort all activities by most recent
+        return allActivities
+            .sort((a, b) => {
+                const timeA = parseTimeAgo(a.timestamp);
+                const timeB = parseTimeAgo(b.timestamp);
+                return timeA - timeB;
+            })
+            .slice(0, 8);
+    }, [payments, loans, borrowers]);
+
+    // Calculate loan status distribution for pie chart
+    const loanStatusData = useMemo(() => {
+        const statusCounts = loans.reduce((acc, loan) => {
+            const status = loan.status || 'active';
+            acc[status] = (acc[status] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        return Object.entries(statusCounts).map(([status, count]) => ({
+            name: status.charAt(0).toUpperCase() + status.slice(1),
+            value: count,
+            color: status === 'active' ? '#3B82F6' : status === 'settled' ? '#10B981' : '#EF4444',
+        }));
+    }, [loans]);
+
+    // Calculate monthly interest earned for area chart
+    const monthlyInterestData = useMemo(() => {
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const months: { [key: string]: { earned: number; collected: number; pending: number } } = {};
+
+        // Initialize last 6 months
+        const today = new Date();
+        for (let i = 5; i >= 0; i--) {
+            const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            const key = `${monthNames[date.getMonth()]}`;
+            months[key] = {earned: 0, collected: 0, pending: 0};
         }
-      });
 
-    // Calculate pending interest (cumulative)
-    let cumulativePending = 0;
-    
-    return Object.entries(months).map(([month, data]) => {
-      cumulativePending += data.earned - data.collected;
-      return {
-        month,
-        earned: Math.round(data.earned),
-        collected: Math.round(data.collected),
-        pending: Math.round(Math.max(0, cumulativePending)),
-      };
-    });
-  }, [loans, payments]);
+        // Calculate interest earned for each loan by month (using 30-day month standard)
+        loans.forEach(loan => {
+            const startDate = new Date(loan.startDate);
+            const interestRate = parseFloat(loan.interestRate) / 100;
+            const principal = parseFloat(loan.principalAmount);
 
-  // Calculate additional metrics including daily and monthly interest
-  const additionalMetrics = useMemo(() => {
-    const totalLoans = loans.length;
-    const avgLoanSize = totalLoans > 0 
-      ? loans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0) / totalLoans 
-      : 0;
-    
-    const avgInterestRate = totalLoans > 0
-      ? loans.reduce((sum, loan) => sum + parseFloat(loan.interestRate), 0) / totalLoans
-      : 0;
-    
-    const totalInterestEarned = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
-    
-    // Calculate daily interest earning (using 30-day month standard)
-    const dailyInterest = loans
-      .filter(loan => loan.status === 'active')
-      .reduce((sum, loan) => {
-        const principal = parseFloat(loan.principalAmount);
-        const monthlyRate = parseFloat(loan.interestRate) / 100;
-        const dailyRate = monthlyRate / 30; // Standard 30-day month
-        return sum + (principal * dailyRate);
-      }, 0);
-    
-    // Calculate monthly interest earning (using 30-day month standard)
-    const monthlyInterest = loans
-      .filter(loan => loan.status === 'active')
-      .reduce((sum, loan) => {
-        const principal = parseFloat(loan.principalAmount);
-        const monthlyRate = parseFloat(loan.interestRate) / 100;
-        return sum + (principal * monthlyRate);
-      }, 0);
-    
-    return {
-      avgLoanSize,
-      avgInterestRate,
-      totalInterestEarned,
-      dailyInterest,
-      monthlyInterest,
+            Object.keys(months).forEach(monthKey => {
+                const monthIndex = monthNames.indexOf(monthKey);
+                const monthDate = new Date(today.getFullYear(), monthIndex, 1);
+
+                if (monthDate >= startDate && loan.status === 'active') {
+                    const monthlyInterest = principal * interestRate; // Standard monthly calculation
+                    months[monthKey].earned += monthlyInterest;
+                }
+            });
+        });
+
+        // Calculate interest payments collected by month
+        payments
+            .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+            .forEach(payment => {
+                const paymentDate = new Date(payment.paymentDate);
+                const monthKey = monthNames[paymentDate.getMonth()];
+                if (months[monthKey]) {
+                    months[monthKey].collected += parseFloat(payment.amount);
+                }
+            });
+
+        // Calculate pending interest (cumulative)
+        let cumulativePending = 0;
+
+        return Object.entries(months).map(([month, data]) => {
+            cumulativePending += data.earned - data.collected;
+            return {
+                month,
+                earned: Math.round(data.earned),
+                collected: Math.round(data.collected),
+                pending: Math.round(Math.max(0, cumulativePending)),
+            };
+        });
+    }, [loans, payments]);
+
+    // Calculate additional metrics including daily and monthly interest
+    const additionalMetrics = useMemo(() => {
+        const totalLoans = loans.length;
+        const avgLoanSize = totalLoans > 0
+            ? loans.reduce((sum, loan) => sum + parseFloat(loan.principalAmount), 0) / totalLoans
+            : 0;
+
+        const avgInterestRate = totalLoans > 0
+            ? loans.reduce((sum, loan) => sum + parseFloat(loan.interestRate), 0) / totalLoans
+            : 0;
+
+        const totalInterestEarned = realTimeInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
+
+        // Calculate daily interest earning (using 30-day month standard)
+        const dailyInterest = loans
+            .filter(loan => loan.status === 'active')
+            .reduce((sum, loan) => {
+                const principal = parseFloat(loan.principalAmount);
+                const monthlyRate = parseFloat(loan.interestRate) / 100;
+                const dailyRate = monthlyRate / 30; // Standard 30-day month
+                return sum + (principal * dailyRate);
+            }, 0);
+
+        // Calculate monthly interest earning (using 30-day month standard)
+        const monthlyInterest = loans
+            .filter(loan => loan.status === 'active')
+            .reduce((sum, loan) => {
+                const principal = parseFloat(loan.principalAmount);
+                const monthlyRate = parseFloat(loan.interestRate) / 100;
+                return sum + (principal * monthlyRate);
+            }, 0);
+
+        return {
+            avgLoanSize,
+            avgInterestRate,
+            totalInterestEarned,
+            dailyInterest,
+            monthlyInterest,
+        };
+    }, [loans, realTimeInterest]);
+
+    const formatCurrency = (value: string | number) => {
+        const num = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(num) || num === 0) return '₹0';
+        return `₹${num.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
     };
-  }, [loans, realTimeInterest]);
 
-  const formatCurrency = (value: string | number) => {
-    const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(num) || num === 0) return '₹0';
-    return `₹${num.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-  };
+    const handleViewDetails = (borrowerId: string) => {
+        // Find the first loan for this borrower and navigate to loan details
+        const borrowerLoan = loans.find(l => l.borrowerId === borrowerId);
+        if (borrowerLoan) {
+            window.location.href = `/loans?id=${borrowerLoan.id}`;
+        } else {
+            window.location.href = `/borrowers?id=${borrowerId}`;
+        }
+    };
 
-  const handleViewDetails = (borrowerId: string) => {
-    // Find the first loan for this borrower and navigate to loan details
-    const borrowerLoan = loans.find(l => l.borrowerId === borrowerId);
-    if (borrowerLoan) {
-      window.location.href = `/loans?id=${borrowerLoan.id}`;
-    } else {
-      window.location.href = `/borrowers?id=${borrowerId}`;
-    }
-  };
+    const handleAddPayment = (borrowerId: string) => {
+        setSelectedBorrowerId(borrowerId);
+        setPaymentModalOpen(true);
+    };
 
-  const handleAddPayment = (borrowerId: string) => {
-    setSelectedBorrowerId(borrowerId);
-    setPaymentModalOpen(true);
-  };
+    const handleSendReminder = (borrowerId: string) => {
+        // Navigate to reminders page with borrower pre-selected
+        window.location.href = `/reminders?borrowerId=${borrowerId}`;
+    };
 
-  const handleSendReminder = (borrowerId: string) => {
-    // Navigate to reminders page with borrower pre-selected
-    window.location.href = `/reminders?borrowerId=${borrowerId}`;
-  };
+    const handleQuickPayment = () => {
+        setSelectedBorrowerId(null); // No pre-selected borrower
+        setPaymentModalOpen(true);
+    };
 
-  const handleQuickPayment = () => {
-    setSelectedBorrowerId(null); // No pre-selected borrower
-    setPaymentModalOpen(true);
-  };
+    const avatars = [avatar1, avatar2, avatar3];
 
-  const avatars = [avatar1, avatar2, avatar3];
+    return (
+        <div className="p-4 md:p-8 space-y-4 md:space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl md:text-3xl font-semibold">Dashboard</h1>
+                    <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
+                        Overview of your lending portfolio
+                    </p>
+                </div>
+                <div className="flex gap-2">
+                    <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setBorrowerModalOpen(true)}
+                            data-testid="button-add-borrower">
+                        <UserPlus className="h-4 w-4 mr-1 md:mr-2"/>
+                        <span className="hidden sm:inline">Add </span>Borrower
+                    </Button>
+                    <Button size="sm" className="md:h-10 md:px-4 md:text-sm" variant="outline"
+                            onClick={handleQuickPayment} data-testid="button-quick-payment">
+                        <Plus className="h-4 w-4 mr-1 md:mr-2"/>
+                        <span className="hidden sm:inline">Quick </span>Payment
+                    </Button>
+                </div>
+            </div>
 
-  return (
-    <div className="p-4 md:p-8 space-y-4 md:space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-semibold">Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground mt-0.5 md:mt-1">
-            Overview of your lending portfolio
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button size="sm" className="md:h-10 md:px-4 md:text-sm" onClick={() => setBorrowerModalOpen(true)} data-testid="button-add-borrower">
-            <UserPlus className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden sm:inline">Add </span>Borrower
-          </Button>
-          <Button size="sm" className="md:h-10 md:px-4 md:text-sm" variant="outline" onClick={handleQuickPayment} data-testid="button-quick-payment">
-            <Plus className="h-4 w-4 mr-1 md:mr-2" />
-            <span className="hidden sm:inline">Quick </span>Payment
-          </Button>
-        </div>
-      </div>
+            {statsLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                        <Skeleton key={i} className="h-28" data-testid={`skeleton-card-${i}`}/>
+                    ))}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {/* Primary metrics */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                        {stats?.cashOnHand !== undefined && stats?.cashOnHand !== null && (
+                            <SummaryCard
+                                title="Cash on Hand"
+                                value={formatCurrency(stats.cashOnHand)}
+                                subValue="All fund holders"
+                                icon={HandCoins}
+                                iconColor="bg-cyan-500"
+                            />
+                        )}
+                        <SummaryCard
+                            title="Total Amount Lent"
+                            value={formatCurrency(stats?.totalLent || 0)}
+                            subValue="All time"
+                            icon={LucideIndianRupee}
+                            iconColor="bg-blue-500"
+                        />
+                        <SummaryCard
+                            title="Outstanding Principal"
+                            value={formatCurrency(stats?.totalOutstanding || 0)}
+                            icon={Banknote}
+                            iconColor="bg-orange-500"
+                        />
+                        <SummaryCard
+                            title="Interest Collected"
+                            value={formatCurrency(payments
+                                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                                .reduce((sum, p) => sum + parseFloat(p.amount), 0))}
+                            icon={TrendingUp}
+                            iconColor="bg-emerald-500"
+                        />
+                        <SummaryCard
+                            title="Pending Interest"
+                            value={formatCurrency(stats?.totalPendingInterest || 0)}
+                            icon={TrendingUp}
+                            iconColor="bg-red-500"
+                        />
+                    </div>
 
-      {statsLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <Skeleton key={i} className="h-28" data-testid={`skeleton-card-${i}`} />
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Primary metrics */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            {stats?.cashOnHand !== undefined && stats?.cashOnHand !== null && (
-              <SummaryCard
-                title="Cash on Hand"
-                value={formatCurrency(stats.cashOnHand)}
-                subValue="All fund holders"
-                icon={HandCoins}
-                iconColor="bg-cyan-500"
-              />
+                    {/* Secondary metrics */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
+                        <SummaryCard
+                            title="Active Borrowers"
+                            value={String(stats?.activeBorrowers || 0)}
+                            subValue={`${borrowers.length} total`}
+                            icon={Users}
+                            iconColor="bg-purple-500"
+                        />
+                        <SummaryCard
+                            title="Daily Earning"
+                            value={formatCurrency(additionalMetrics.dailyInterest)}
+                            subValue="Per day"
+                            icon={TrendingUp}
+                            iconColor="bg-green-500"
+                        />
+                        <SummaryCard
+                            title="Monthly Earning"
+                            value={formatCurrency(additionalMetrics.monthlyInterest)}
+                            subValue="Per month"
+                            icon={TrendingUp}
+                            iconColor="bg-teal-500"
+                        />
+                        <SummaryCard
+                            title="Avg Loan Size"
+                            value={`₹${additionalMetrics.avgLoanSize.toLocaleString('en-IN', {maximumFractionDigits: 0})}`}
+                            subValue={`${loans.length} loans`}
+                            icon={Banknote}
+                            iconColor="bg-slate-500"
+                        />
+                        <SummaryCard
+                            title="Avg Interest Rate"
+                            value={`${additionalMetrics.avgInterestRate.toFixed(2)}%`}
+                            subValue="Per month"
+                            icon={TrendingUp}
+                            iconColor="bg-indigo-500"
+                        />
+                        <SummaryCard
+                            title="Total Interest Earned"
+                            value={`₹${additionalMetrics.totalInterestEarned.toLocaleString('en-IN', {maximumFractionDigits: 0})}`}
+                            subValue="Real-time"
+                            icon={TrendingUp}
+                            iconColor="bg-emerald-600"
+                        />
+                    </div>
+                </div>
             )}
-            <SummaryCard
-              title="Total Amount Lent"
-              value={formatCurrency(stats?.totalLent || 0)}
-              subValue="All time"
-              icon={LucideIndianRupee}
-              iconColor="bg-blue-500"
-            />
-            <SummaryCard
-              title="Outstanding Principal"
-              value={formatCurrency(stats?.totalOutstanding || 0)}
-              icon={Banknote}
-              iconColor="bg-orange-500"
-            />
-            <SummaryCard
-              title="Interest Collected"
-              value={formatCurrency(payments
-                .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-                .reduce((sum, p) => sum + parseFloat(p.amount), 0))}
-              icon={TrendingUp}
-              iconColor="bg-emerald-500"
-            />
-            <SummaryCard
-              title="Pending Interest"
-              value={formatCurrency(stats?.totalPendingInterest || 0)}
-              icon={TrendingUp}
-              iconColor="bg-red-500"
-            />
-          </div>
 
-          {/* Secondary metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-            <SummaryCard
-              title="Active Borrowers"
-              value={String(stats?.activeBorrowers || 0)}
-              subValue={`${borrowers.length} total`}
-              icon={Users}
-              iconColor="bg-purple-500"
+            {borrowersLoading ? (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Skeleton className="lg:col-span-2 h-96"/>
+                    <Skeleton className="h-96"/>
+                </div>
+            ) : borrowers.length === 0 ? (
+                <div className="p-12 text-center border rounded-lg">
+                    <Users className="h-16 w-16 mx-auto mb-4 opacity-50 text-muted-foreground"/>
+                    <h3 className="text-lg font-semibold mb-2">No Borrowers Yet</h3>
+                    <p className="text-muted-foreground mb-4">Get started by adding your first borrower</p>
+                    <Button onClick={() => setBorrowerModalOpen(true)}>
+                        <UserPlus className="h-4 w-4 mr-2"/>
+                        Add Your First Borrower
+                    </Button>
+                </div>
+            ) : (
+                <>
+
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <PieChartIcon className="h-5 w-5"/>
+                                    Loan Status Distribution
+                                </CardTitle>
+                                <CardDescription>Breakdown of loans by status</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {loanStatusData.length === 0 ? (
+                                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                                        No loan data available
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <PieChart>
+                                            <Pie
+                                                data={loanStatusData}
+                                                cx="50%"
+                                                cy="50%"
+                                                labelLine={false}
+                                                label={({
+                                                            name,
+                                                            value,
+                                                            percent
+                                                        }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                                                outerRadius={80}
+                                                fill="#8884d8"
+                                                dataKey="value"
+                                            >
+                                                {loanStatusData.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color}/>
+                                                ))}
+                                            </Pie>
+                                            <Tooltip/>
+                                            <Legend/>
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <TrendingUp className="h-5 w-5"/>
+                                    Monthly Interest Analysis
+                                </CardTitle>
+                                <CardDescription>Interest earned vs collected vs pending over the last 6
+                                    months</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {monthlyInterestData.every(d => d.earned === 0) ? (
+                                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                                        No interest data available
+                                    </div>
+                                ) : (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <AreaChart data={monthlyInterestData}>
+                                            <defs>
+                                                <linearGradient id="colorEarned" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                                </linearGradient>
+                                                <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                                </linearGradient>
+                                                <linearGradient id="colorPending" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3"/>
+                                            <XAxis dataKey="month"/>
+                                            <YAxis/>
+                                            <Tooltip
+                                                formatter={(value: number, name: string) => {
+                                                    const label = name === 'earned' ? 'Interest Earned' :
+                                                        name === 'collected' ? 'Interest Collected' : 'Pending Interest';
+                                                    return [`₹${value.toLocaleString()}`, label];
+                                                }}
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="earned"
+                                                stackId="1"
+                                                stroke="#10B981"
+                                                fillOpacity={1}
+                                                fill="url(#colorEarned)"
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="collected"
+                                                stackId="2"
+                                                stroke="#3B82F6"
+                                                fillOpacity={1}
+                                                fill="url(#colorCollected)"
+                                            />
+                                            <Area
+                                                type="monotone"
+                                                dataKey="pending"
+                                                stackId="3"
+                                                stroke="#EF4444"
+                                                fillOpacity={1}
+                                                fill="url(#colorPending)"
+                                            />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <div>
+                        <Tabs defaultValue="all" className="w-full">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                                <h2 className="text-lg md:text-xl font-semibold">Borrowers</h2>
+                                <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
+                                    <TabsTrigger value="all" data-testid="tab-all" className="text-xs sm:text-sm">All
+                                        ({borrowers.length})</TabsTrigger>
+                                    <TabsTrigger value="active" data-testid="tab-active" className="text-xs sm:text-sm">
+                                        Active ({borrowers.filter((b) => b.status === 'active').length})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="overdue" data-testid="tab-overdue"
+                                                 className="text-xs sm:text-sm">
+                                        Overdue ({borrowers.filter((b) => b.status === 'overdue').length})
+                                    </TabsTrigger>
+                                    <TabsTrigger value="settled" data-testid="tab-settled"
+                                                 className="text-xs sm:text-sm">
+                                        Settled ({borrowers.filter((b) => b.status === 'settled').length})
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+
+                            {['all', 'active', 'overdue', 'settled'].map((tab) => (
+                                <TabsContent key={tab} value={tab} className="mt-0">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                                        {borrowers
+                                            .filter((b) => tab === 'all' || b.status === tab)
+                                            .map((borrower, index) => {
+                                                const borrowerLoans = loans.filter((l) => l.borrowerId === borrower.id);
+                                                const borrowerPayments = payments.filter((p) =>
+                                                    borrowerLoans.some((l) => l.id === p.loanId)
+                                                );
+                                                const borrowerInterestData = realTimeInterest.filter((i: any) => i.borrowerId === borrower.id);
+
+                                                const totalLent = borrowerLoans.reduce((sum, loan) => sum + (parseFloat(loan.principalAmount) || 0), 0);
+                                                const totalInterestGenerated = borrowerInterestData.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
+
+                                                // Calculate payments allocation
+                                                let principalPaid = 0;
+                                                let interestPaid = 0;
+
+                                                borrowerPayments.forEach(payment => {
+                                                    const amount = parseFloat(payment.amount) || 0;
+                                                    // Always apply payment to interest first, then principal
+                                                    const pendingInterestAtTime = totalInterestGenerated - interestPaid;
+                                                    const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
+                                                    const toPrincipal = amount - toInterest;
+                                                    interestPaid += toInterest;
+                                                    principalPaid += toPrincipal;
+                                                });
+
+                                                const outstanding = totalLent - principalPaid;
+                                                const pendingInterest = totalInterestGenerated - interestPaid;
+                                                const totalPaidAmount = borrowerPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+
+                                                const lastPayment = borrowerPayments.sort((a, b) =>
+                                                    new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
+                                                )[0];
+
+                                                // Get latest interest cleared till date
+                                                const getLatestInterestClearedDate = () => {
+                                                    const interestPayments = borrowerPayments
+                                                        .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
+                                                        .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
+                                                    return interestPayments[0]?.interestClearedTillDate || null;
+                                                };
+
+                                                const latestInterestClearedDate = getLatestInterestClearedDate();
+
+                                                return (
+                                                    <BorrowerCard
+                                                        key={borrower.id}
+                                                        id={borrower.id}
+                                                        name={borrower.name}
+                                                        email={borrower.email}
+                                                        phone={borrower.phone}
+                                                        avatar={avatars[index % 3]}
+                                                        totalLent={formatCurrency(totalLent)}
+                                                        outstanding={formatCurrency(outstanding)}
+                                                        interestEarned={`₹${totalInterestGenerated.toLocaleString('en-IN', {maximumFractionDigits: 0})}`}
+                                                        pendingInterest={`₹${pendingInterest.toLocaleString('en-IN', {maximumFractionDigits: 0})}`}
+                                                        totalPaid={`₹${totalPaidAmount.toLocaleString('en-IN', {maximumFractionDigits: 0})}`}
+                                                        paymentCount={borrowerPayments.length}
+                                                        lastPayment={lastPayment ? {
+                                                            date: new Date(lastPayment.paymentDate).toISOString().split('T')[0],
+                                                            amount: `₹${parseFloat(lastPayment.amount).toLocaleString('en-IN')}`
+                                                        } : undefined}
+                                                        daysSincePayment={lastPayment ?
+                                                            Math.floor((Date.now() - new Date(lastPayment.paymentDate).getTime()) / (1000 * 60 * 60 * 24))
+                                                            : 0}
+                                                        interestClearedTillDate={latestInterestClearedDate ? (() => {
+                                                            const dateObj = new Date(latestInterestClearedDate);
+                                                            const day = dateObj.getDate();
+                                                            const month = dateObj.toLocaleDateString('en-IN', {month: 'short'});
+                                                            const year = dateObj.getFullYear();
+                                                            const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
+                                                                day === 2 || day === 22 ? 'nd' :
+                                                                    day === 3 || day === 23 ? 'rd' : 'th';
+                                                            return `${day}${suffix} ${month}, ${year}`;
+                                                        })() : undefined}
+                                                        status={borrower.status as 'active' | 'overdue' | 'settled'}
+                                                        onViewDetails={handleViewDetails}
+                                                        onAddPayment={handleAddPayment}
+                                                        onSendReminder={handleSendReminder}
+                                                    />
+                                                );
+                                            })}
+                                        {borrowers.filter((b) => tab === 'all' || b.status === tab).length === 0 && (
+                                            <div className="col-span-2 p-12 text-center text-muted-foreground">
+                                                <Users className="h-16 w-16 mx-auto mb-4 opacity-50"/>
+                                                <p>No {tab === 'all' ? '' : tab} borrowers</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </TabsContent>
+                            ))}
+                        </Tabs>
+                    </div>
+                </>
+            )}
+
+            <AddPaymentModal
+                open={paymentModalOpen}
+                onClose={() => {
+                    setPaymentModalOpen(false);
+                    setSelectedBorrowerId(null);
+                }}
+                preSelectedBorrowerId={selectedBorrowerId}
             />
-            <SummaryCard
-              title="Daily Earning"
-              value={formatCurrency(additionalMetrics.dailyInterest)}
-              subValue="Per day"
-              icon={TrendingUp}
-              iconColor="bg-green-500"
-            />
-            <SummaryCard
-              title="Monthly Earning"
-              value={formatCurrency(additionalMetrics.monthlyInterest)}
-              subValue="Per month"
-              icon={TrendingUp}
-              iconColor="bg-teal-500"
-            />
-            <SummaryCard
-              title="Avg Loan Size"
-              value={`₹${additionalMetrics.avgLoanSize.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue={`${loans.length} loans`}
-              icon={Banknote}
-              iconColor="bg-slate-500"
-            />
-            <SummaryCard
-              title="Avg Interest Rate"
-              value={`${additionalMetrics.avgInterestRate.toFixed(2)}%`}
-              subValue="Per month"
-              icon={TrendingUp}
-              iconColor="bg-indigo-500"
-            />
-            <SummaryCard
-              title="Total Interest Earned"
-              value={`₹${additionalMetrics.totalInterestEarned.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              subValue="Real-time"
-              icon={TrendingUp}
-              iconColor="bg-emerald-600"
-            />
-          </div>
+            <AddBorrowerModal open={borrowerModalOpen} onClose={() => setBorrowerModalOpen(false)}/>
         </div>
-      )}
-
-      {borrowersLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Skeleton className="lg:col-span-2 h-96" />
-          <Skeleton className="h-96" />
-        </div>
-      ) : borrowers.length === 0 ? (
-        <div className="p-12 text-center border rounded-lg">
-          <Users className="h-16 w-16 mx-auto mb-4 opacity-50 text-muted-foreground" />
-          <h3 className="text-lg font-semibold mb-2">No Borrowers Yet</h3>
-          <p className="text-muted-foreground mb-4">Get started by adding your first borrower</p>
-          <Button onClick={() => setBorrowerModalOpen(true)}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add Your First Borrower
-          </Button>
-        </div>
-      ) : (
-        <>
-
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PieChartIcon className="h-5 w-5" />
-                  Loan Status Distribution
-                </CardTitle>
-                <CardDescription>Breakdown of loans by status</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loanStatusData.length === 0 ? (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    No loan data available
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <PieChart>
-                      <Pie
-                        data={loanStatusData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                      >
-                        {loanStatusData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Monthly Interest Analysis
-                </CardTitle>
-                <CardDescription>Interest earned vs collected vs pending over the last 6 months</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {monthlyInterestData.every(d => d.earned === 0) ? (
-                  <div className="h-64 flex items-center justify-center text-muted-foreground">
-                    No interest data available
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height={300}>
-                    <AreaChart data={monthlyInterestData}>
-                      <defs>
-                        <linearGradient id="colorEarned" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorCollected" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorPending" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#EF4444" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value: number, name: string) => {
-                          const label = name === 'earned' ? 'Interest Earned' : 
-                                       name === 'collected' ? 'Interest Collected' : 'Pending Interest';
-                          return [`₹${value.toLocaleString()}`, label];
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="earned" 
-                        stackId="1"
-                        stroke="#10B981" 
-                        fillOpacity={1} 
-                        fill="url(#colorEarned)" 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="collected" 
-                        stackId="2"
-                        stroke="#3B82F6" 
-                        fillOpacity={1} 
-                        fill="url(#colorCollected)" 
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="pending" 
-                        stackId="3"
-                        stroke="#EF4444" 
-                        fillOpacity={1} 
-                        fill="url(#colorPending)" 
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div>
-            <Tabs defaultValue="all" className="w-full">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
-                <h2 className="text-lg md:text-xl font-semibold">Borrowers</h2>
-                <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
-                  <TabsTrigger value="all" data-testid="tab-all" className="text-xs sm:text-sm">All ({borrowers.length})</TabsTrigger>
-                  <TabsTrigger value="active" data-testid="tab-active" className="text-xs sm:text-sm">
-                    Active ({borrowers.filter((b) => b.status === 'active').length})
-                  </TabsTrigger>
-                  <TabsTrigger value="overdue" data-testid="tab-overdue" className="text-xs sm:text-sm">
-                    Overdue ({borrowers.filter((b) => b.status === 'overdue').length})
-                  </TabsTrigger>
-                  <TabsTrigger value="settled" data-testid="tab-settled" className="text-xs sm:text-sm">
-                    Settled ({borrowers.filter((b) => b.status === 'settled').length})
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              {['all', 'active', 'overdue', 'settled'].map((tab) => (
-                <TabsContent key={tab} value={tab} className="mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                    {borrowers
-                      .filter((b) => tab === 'all' || b.status === tab)
-                      .map((borrower, index) => {
-                        const borrowerLoans = loans.filter((l) => l.borrowerId === borrower.id);
-                        const borrowerPayments = payments.filter((p) => 
-                          borrowerLoans.some((l) => l.id === p.loanId)
-                        );
-                        const borrowerInterestData = realTimeInterest.filter((i: any) => i.borrowerId === borrower.id);
-                        
-                        const totalLent = borrowerLoans.reduce((sum, loan) => sum + (parseFloat(loan.principalAmount) || 0), 0);
-                        const totalInterestGenerated = borrowerInterestData.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
-                        
-                        // Calculate payments allocation
-                        let principalPaid = 0;
-                        let interestPaid = 0;
-                        
-                        borrowerPayments.forEach(payment => {
-                          const amount = parseFloat(payment.amount) || 0;
-                          // Always apply payment to interest first, then principal
-                          const pendingInterestAtTime = totalInterestGenerated - interestPaid;
-                          const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
-                          const toPrincipal = amount - toInterest;
-                          interestPaid += toInterest;
-                          principalPaid += toPrincipal;
-                        });
-                        
-                        const outstanding = totalLent - principalPaid;
-                        const pendingInterest = totalInterestGenerated - interestPaid;
-                        const totalPaidAmount = borrowerPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
-                        
-                        const lastPayment = borrowerPayments.sort((a, b) => 
-                          new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime()
-                        )[0];
-                        
-                        // Get latest interest cleared till date
-                        const getLatestInterestClearedDate = () => {
-                          const interestPayments = borrowerPayments
-                            .filter(p => (p.paymentType === 'interest' || p.paymentType === 'partial_interest') && p.interestClearedTillDate)
-                            .sort((a, b) => new Date(b.interestClearedTillDate!).getTime() - new Date(a.interestClearedTillDate!).getTime());
-                          return interestPayments[0]?.interestClearedTillDate || null;
-                        };
-                        
-                        const latestInterestClearedDate = getLatestInterestClearedDate();
-                        
-                        return (
-                          <BorrowerCard
-                            key={borrower.id}
-                            id={borrower.id}
-                            name={borrower.name}
-                            email={borrower.email}
-                            phone={borrower.phone}
-                            avatar={avatars[index % 3]}
-                            totalLent={formatCurrency(totalLent)}
-                            outstanding={formatCurrency(outstanding)}
-                            interestEarned={`₹${totalInterestGenerated.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                            pendingInterest={`₹${pendingInterest.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                            totalPaid={`₹${totalPaidAmount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                            paymentCount={borrowerPayments.length}
-                            lastPayment={lastPayment ? {
-                              date: new Date(lastPayment.paymentDate).toISOString().split('T')[0],
-                              amount: `₹${parseFloat(lastPayment.amount).toLocaleString('en-IN')}`
-                            } : undefined}
-                            daysSincePayment={lastPayment ? 
-                              Math.floor((Date.now() - new Date(lastPayment.paymentDate).getTime()) / (1000 * 60 * 60 * 24))
-                              : 0}
-                            interestClearedTillDate={latestInterestClearedDate ? (() => {
-                              const dateObj = new Date(latestInterestClearedDate);
-                              const day = dateObj.getDate();
-                              const month = dateObj.toLocaleDateString('en-IN', { month: 'short' });
-                              const year = dateObj.getFullYear();
-                              const suffix = day === 1 || day === 21 || day === 31 ? 'st' :
-                                           day === 2 || day === 22 ? 'nd' :
-                                           day === 3 || day === 23 ? 'rd' : 'th';
-                              return `${day}${suffix} ${month}, ${year}`;
-                            })() : undefined}
-                            status={borrower.status as 'active' | 'overdue' | 'settled'}
-                            onViewDetails={handleViewDetails}
-                            onAddPayment={handleAddPayment}
-                            onSendReminder={handleSendReminder}
-                          />
-                        );
-                      })}
-                    {borrowers.filter((b) => tab === 'all' || b.status === tab).length === 0 && (
-                      <div className="col-span-2 p-12 text-center text-muted-foreground">
-                        <Users className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                        <p>No {tab === 'all' ? '' : tab} borrowers</p>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              ))}
-            </Tabs>
-          </div>
-        </>
-      )}
-
-      <AddPaymentModal 
-        open={paymentModalOpen} 
-        onClose={() => {
-          setPaymentModalOpen(false);
-          setSelectedBorrowerId(null);
-        }}
-        preSelectedBorrowerId={selectedBorrowerId}
-      />
-      <AddBorrowerModal open={borrowerModalOpen} onClose={() => setBorrowerModalOpen(false)} />
-    </div>
-  );
+    );
 }
 
 // Helper function to calculate time ago
 function getTimeAgo(date: Date): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'Just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
-  if (seconds < 2592000) return `${Math.floor(seconds / 604800)} weeks ago`;
-  return `${Math.floor(seconds / 2592000)} months ago`;
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+    if (seconds < 604800) return `${Math.floor(seconds / 86400)} days ago`;
+    if (seconds < 2592000) return `${Math.floor(seconds / 604800)} weeks ago`;
+    return `${Math.floor(seconds / 2592000)} months ago`;
 }
 
 // Helper function to parse time ago string to seconds for sorting
 function parseTimeAgo(timeAgo: string): number {
-  if (timeAgo === 'Just now') return 0;
-  const match = timeAgo.match(/(\d+)\s+(\w+)/);
-  if (!match) return 0;
-  
-  const value = parseInt(match[1]);
-  const unit = match[2];
-  
-  if (unit.startsWith('minute')) return value * 60;
-  if (unit.startsWith('hour')) return value * 3600;
-  if (unit.startsWith('day')) return value * 86400;
-  if (unit.startsWith('week')) return value * 604800;
-  if (unit.startsWith('month')) return value * 2592000;
-  return 0;
+    if (timeAgo === 'Just now') return 0;
+    const match = timeAgo.match(/(\d+)\s+(\w+)/);
+    if (!match) return 0;
+
+    const value = parseInt(match[1]);
+    const unit = match[2];
+
+    if (unit.startsWith('minute')) return value * 60;
+    if (unit.startsWith('hour')) return value * 3600;
+    if (unit.startsWith('day')) return value * 86400;
+    if (unit.startsWith('week')) return value * 604800;
+    if (unit.startsWith('month')) return value * 2592000;
+    return 0;
 }
