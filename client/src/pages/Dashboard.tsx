@@ -18,9 +18,9 @@ import avatar2 from '@assets/generated_images/Professional_female_avatar_headsho
 import avatar3 from '@assets/generated_images/Professional_diverse_avatar_headshot_7572a5aa.png';
 
 interface DashboardStats {
-  totalLent: string;
-  totalOutstanding: string;
-  totalPendingInterest: string;
+  totalLent: number;
+  totalOutstanding: number;
+  totalPendingInterest: number;
   activeBorrowers: number;
   cashOnHand?: number;
 }

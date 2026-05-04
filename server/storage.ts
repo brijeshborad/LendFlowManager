@@ -89,9 +89,9 @@ export interface IStorage {
 
   // Analytics operations
   getDashboardStats(userId: string): Promise<{
-    totalLent: string;
-    totalOutstanding: string;
-    totalPendingInterest: string;
+    totalLent: number;
+    totalOutstanding: number;
+    totalPendingInterest: number;
     activeBorrowers: number;
     cashOnHand?: number;
   }>;
@@ -436,9 +436,9 @@ export class DatabaseStorage implements IStorage {
 
   // Analytics operations - optimized to 2 queries + interest calculation
   async getDashboardStats(userId: string): Promise<{
-    totalLent: string;
-    totalOutstanding: string;
-    totalPendingInterest: string;
+    totalLent: number;
+    totalOutstanding: number;
+    totalPendingInterest: number;
     activeBorrowers: number;
     cashOnHand?: number;
   }> {
@@ -459,10 +459,10 @@ export class DatabaseStorage implements IStorage {
       calculateRealTimeInterestForUser(userId),
     ]);
     const combinedStats = [{
-      totalLent: loanStats[0]?.totalLent || 0,
-      activeBorrowers: loanStats[0]?.activeBorrowers || 0,
-      principalPaid: paymentStats[0]?.principalPaid || 0,
-      interestPaid: paymentStats[0]?.interestPaid || 0,
+      totalLent: Number(loanStats[0]?.totalLent) || 0,
+      activeBorrowers: Number(loanStats[0]?.activeBorrowers) || 0,
+      principalPaid: Number(paymentStats[0]?.principalPaid) || 0,
+      interestPaid: Number(paymentStats[0]?.interestPaid) || 0,
     }];
 
     const totalInterestGenerated = realTimeInterest.reduce((sum, entry) => sum + entry.totalInterest, 0);
@@ -484,9 +484,9 @@ export class DatabaseStorage implements IStorage {
     }
 
     return {
-      totalLent: `₹${totalLent.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
-      totalOutstanding: `₹${outstandingPrincipal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
-      totalPendingInterest: `₹${interestPending.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`,
+      totalLent,
+      totalOutstanding: outstandingPrincipal,
+      totalPendingInterest: interestPending,
       activeBorrowers,
       cashOnHand,
     };
