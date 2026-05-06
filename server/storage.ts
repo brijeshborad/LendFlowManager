@@ -32,7 +32,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ne, desc, gte, lte, sql, isNotNull } from "drizzle-orm";
-import { calculateRealTimeInterestForUser } from "./interestCalculationService";
+import { calculateRealTimeInterestForUser, calculateInterestFromPayments } from "./interestCalculationService";
 
 // Interface for storage operations
 export interface IStorage {
@@ -216,6 +216,71 @@ export class DatabaseStorage implements IStorage {
   async getLoan(id: string, userId: string): Promise<Loan | undefined> {
     const [loan] = await db.select().from(loans).where(and(eq(loans.id, id), eq(loans.userId, userId)));
     return loan;
+  }
+
+  /**
+   * Loan detail bundle for the loan detail page — single round trip:
+   * loan + borrower + payments + computed interest (handles closed loans).
+   */
+  async getLoanDetails(id: string, userId: string) {
+    const [loan] = await db
+      .select()
+      .from(loans)
+      .where(and(eq(loans.id, id), eq(loans.userId, userId)));
+    if (!loan) return null;
+
+    const [borrower] = await db
+      .select()
+      .from(borrowers)
+      .where(and(eq(borrowers.id, loan.borrowerId), eq(borrowers.userId, userId)));
+
+    const loanPayments = await this.getPayments(userId, loan.id);
+
+    const principalPayments = loanPayments
+      .filter((p: any) => p.paymentType === 'principal')
+      .map((p: any) => ({ paymentDate: p.paymentDate, amount: p.amount }));
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const accrualEnd = loan.status !== 'active' && loan.closedAt
+      ? new Date(loan.closedAt)
+      : today;
+
+    const totalInterest = calculateInterestFromPayments(
+      principalPayments,
+      parseFloat(loan.principalAmount),
+      parseFloat(loan.interestRate),
+      loan.interestRateType as 'monthly' | 'annual',
+      new Date(loan.startDate),
+      accrualEnd,
+    );
+
+    const principalPaid = loanPayments
+      .filter((p: any) => p.paymentType === 'principal' || p.paymentType === 'mixed')
+      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+    const interestPaid = loanPayments
+      .filter((p: any) => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+      .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+
+    const latestInterestClearedDate = loanPayments
+      .filter((p: any) => p.interestClearedTillDate && (p.paymentType === 'interest' || p.paymentType === 'partial_interest'))
+      .map((p: any) => new Date(p.interestClearedTillDate))
+      .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0] || null;
+
+    return {
+      loan,
+      borrower: borrower || null,
+      payments: loanPayments,
+      totals: {
+        totalInterest: parseFloat(totalInterest.toFixed(2)),
+        principalPaid: parseFloat(principalPaid.toFixed(2)),
+        interestPaid: parseFloat(interestPaid.toFixed(2)),
+        outstandingPrincipal: parseFloat(Math.max(0, parseFloat(loan.principalAmount) - principalPaid).toFixed(2)),
+        pendingInterest: parseFloat(Math.max(0, totalInterest - interestPaid).toFixed(2)),
+        latestInterestClearedDate,
+        accrualEndDate: accrualEnd,
+      },
+    };
   }
 
   async createLoan(loan: InsertLoan): Promise<Loan> {
@@ -452,9 +517,12 @@ export class DatabaseStorage implements IStorage {
       .where(eq(loans.userId, userId)),
       db.select({
         principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
-        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+        // Only count interest payments on active loans — totalInterestGenerated below
+        // also excludes settled loans, so including their paid interest would understate pending.
+        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${loans.status} = 'active' THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
       })
       .from(payments)
+      .innerJoin(loans, eq(payments.loanId, loans.id))
       .where(eq(payments.userId, userId)),
       calculateRealTimeInterestForUser(userId),
     ]);
@@ -496,6 +564,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .select({
         loanId: loans.id,
+        borrowerId: loans.borrowerId,
         borrowerName: borrowers.name,
         principalAmount: loans.principalAmount,
         interestRate: loans.interestRate,
@@ -511,28 +580,34 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(borrowers, eq(loans.borrowerId, borrowers.id))
       .leftJoin(payments, eq(loans.id, payments.loanId))
       .where(eq(loans.userId, userId))
-      .groupBy(loans.id, borrowers.name, loans.principalAmount, loans.interestRate, loans.startDate, loans.status)
+      .groupBy(loans.id, loans.borrowerId, borrowers.name, loans.principalAmount, loans.interestRate, loans.startDate, loans.status)
       .orderBy(desc(loans.startDate));
     
-    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
-    
+    const realTimeInterest = await calculateRealTimeInterestForUser(userId, { includeAllLoans: true });
+
     return result.map(row => {
       const loanInterest = realTimeInterest.find((i: any) => i.loanId === row.loanId);
       const totalInterest = loanInterest?.totalInterest || 0;
       const principalAmount = parseFloat(row.principalAmount.toString());
-      const outstandingPrincipal = principalAmount - row.principalPaid;
-      const pendingInterest = totalInterest - row.interestPaid;
-      
+      const principalPaid = Number(row.principalPaid) || 0;
+      const interestPaid = Number(row.interestPaid) || 0;
+      const outstandingPrincipal = Math.max(0, principalAmount - principalPaid);
+      // Floor at 0 — if a closed loan had over-collection on interest, don't display negative
+      const pendingInterest = Math.max(0, totalInterest - interestPaid);
+
       return {
         loanId: row.loanId,
+        borrowerId: (row as any).borrowerId,
         borrowerName: row.borrowerName || 'Unknown',
         principalAmount: parseFloat(principalAmount.toFixed(2)),
+        principalPaid: parseFloat(principalPaid.toFixed(2)),
+        interestPaid: parseFloat(interestPaid.toFixed(2)),
         outstandingPrincipal: parseFloat(outstandingPrincipal.toFixed(2)),
         interestRate: parseFloat(parseFloat(row.interestRate.toString()).toFixed(2)),
         startDate: row.startDate,
         status: row.status || 'active',
         totalInterest: parseFloat(totalInterest.toFixed(2)),
-        totalPaid: parseFloat((row.totalPaid || 0).toString()),
+        totalPaid: parseFloat((Number(row.totalPaid) || 0).toFixed(2)),
         pendingInterest: parseFloat(pendingInterest.toFixed(2)),
         interestClearedTillDate: row.latestInterestClearedDate,
         paymentCount: row.paymentCount,
@@ -541,50 +616,81 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBorrowerSummaryReport(userId: string) {
-    const result = await db
-      .select({
-        borrowerId: borrowers.id,
-        borrowerName: borrowers.name,
-        email: borrowers.email,
-        phone: borrowers.phone,
-        loanCount: sql<number>`COUNT(DISTINCT ${loans.id})`,
-        activeLoans: sql<number>`COUNT(DISTINCT CASE WHEN ${loans.status} = 'active' THEN ${loans.id} END)`,
-        totalPrincipal: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
-        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
-        principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
-        interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
-        latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
-      })
-      .from(borrowers)
-      .leftJoin(loans, eq(borrowers.id, loans.borrowerId))
-      .leftJoin(payments, eq(loans.id, payments.loanId))
-      .where(eq(borrowers.userId, userId))
-      .groupBy(borrowers.id, borrowers.name, borrowers.email, borrowers.phone)
-      .orderBy(borrowers.name);
-    
-    const realTimeInterest = await calculateRealTimeInterestForUser(userId);
-    
-    return result.map(row => {
-      const borrowerInterest = realTimeInterest.filter((i: any) => 
-        result.some(r => r.borrowerId === row.borrowerId)
-      );
+    // Loan-level and payment-level aggregates must be computed in SEPARATE queries.
+    // Joining borrowers ⨝ loans ⨝ payments and then SUMming loans.principal_amount
+    // multiplies each loan's principal by its payment count, producing inflated totals
+    // (e.g. one ₹50,000 loan with 100 payments would surface as ₹50,00,000).
+
+    const [borrowerRows, loanAggRows, paymentAggRows, realTimeInterest] = await Promise.all([
+      db
+        .select({
+          borrowerId: borrowers.id,
+          borrowerName: borrowers.name,
+          email: borrowers.email,
+          phone: borrowers.phone,
+        })
+        .from(borrowers)
+        .where(eq(borrowers.userId, userId))
+        .orderBy(borrowers.name),
+
+      db
+        .select({
+          borrowerId: loans.borrowerId,
+          loanCount: sql<number>`COUNT(${loans.id})`,
+          activeLoans: sql<number>`COUNT(CASE WHEN ${loans.status} = 'active' THEN 1 END)`,
+          totalPrincipal: sql<number>`COALESCE(SUM(CAST(${loans.principalAmount} AS NUMERIC)), 0)`,
+        })
+        .from(loans)
+        .where(eq(loans.userId, userId))
+        .groupBy(loans.borrowerId),
+
+      db
+        .select({
+          borrowerId: loans.borrowerId,
+          totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed', 'interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          principalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('principal', 'mixed') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          interestPaid: sql<number>`COALESCE(SUM(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') THEN CAST(${payments.amount} AS NUMERIC) ELSE 0 END), 0)`,
+          latestInterestClearedDate: sql<string>`MAX(CASE WHEN ${payments.paymentType} IN ('interest', 'partial_interest') AND ${payments.interestClearedTillDate} IS NOT NULL THEN ${payments.interestClearedTillDate} END)`,
+        })
+        .from(payments)
+        .innerJoin(loans, eq(payments.loanId, loans.id))
+        .where(eq(payments.userId, userId))
+        .groupBy(loans.borrowerId),
+
+      calculateRealTimeInterestForUser(userId, { includeAllLoans: true }),
+    ]);
+
+    const loanAggByBorrower = new Map(loanAggRows.map(r => [r.borrowerId, r]));
+    const paymentAggByBorrower = new Map(paymentAggRows.map(r => [r.borrowerId, r]));
+
+    return borrowerRows.map(row => {
+      const loanAgg = loanAggByBorrower.get(row.borrowerId);
+      const paymentAgg = paymentAggByBorrower.get(row.borrowerId);
+
+      const borrowerInterest = realTimeInterest.filter((i: any) => i.borrowerId === row.borrowerId);
       const totalInterest = borrowerInterest.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
-      const outstandingPrincipal = row.totalPrincipal - row.principalPaid;
-      const pendingInterest = totalInterest - row.interestPaid;
-      
+
+      const totalPrincipal = Number(loanAgg?.totalPrincipal) || 0;
+      const principalPaid = Number(paymentAgg?.principalPaid) || 0;
+      const interestPaid = Number(paymentAgg?.interestPaid) || 0;
+      const outstandingPrincipal = Math.max(0, totalPrincipal - principalPaid);
+      const pendingInterest = Math.max(0, totalInterest - interestPaid);
+
       return {
         borrowerId: row.borrowerId,
         borrowerName: row.borrowerName,
         email: row.email,
         phone: row.phone,
-        loanCount: row.loanCount,
-        totalPrincipal: parseFloat((row.totalPrincipal || 0).toString()),
+        loanCount: Number(loanAgg?.loanCount) || 0,
+        activeLoans: Number(loanAgg?.activeLoans) || 0,
+        totalPrincipal: parseFloat(totalPrincipal.toFixed(2)),
+        principalPaid: parseFloat(principalPaid.toFixed(2)),
+        interestPaid: parseFloat(interestPaid.toFixed(2)),
         outstandingPrincipal: parseFloat(outstandingPrincipal.toFixed(2)),
         totalInterest: parseFloat(totalInterest.toFixed(2)),
-        totalPaid: parseFloat((row.totalPaid || 0).toString()),
+        totalPaid: parseFloat((Number(paymentAgg?.totalPaid) || 0).toFixed(2)),
         pendingInterest: parseFloat(pendingInterest.toFixed(2)),
-        interestClearedTillDate: row.latestInterestClearedDate,
-        activeLoans: row.activeLoans,
+        interestClearedTillDate: paymentAgg?.latestInterestClearedDate ?? null,
       };
     });
   }

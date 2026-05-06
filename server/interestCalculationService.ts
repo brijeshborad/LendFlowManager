@@ -181,23 +181,31 @@ export async function calculateInterestWithPrincipalPayments(
 }
 
 /**
- * Calculate total interest for all active loans in real-time.
- * Optimized: loads all principal payments for active loans in a single query.
+   * Calculate total interest for loans in real-time.
+ * Default: active loans only (legacy behavior).
+ * Pass { includeAllLoans: true } to also include settled/closed loans;
+ * for those, accrual stops at `closedAt` (or `today` if not set).
  */
-export async function calculateRealTimeInterestForUser(userId: string) {
+export async function calculateRealTimeInterestForUser(
+  userId: string,
+  options: { includeAllLoans?: boolean } = {}
+) {
   try {
-    const activeLoans = await db
+    const baseFilter = options.includeAllLoans
+      ? eq(loans.userId, userId)
+      : and(eq(loans.userId, userId), eq(loans.status, 'active'));
+
+    const targetLoans = await db
       .select()
       .from(loans)
-      .where(and(eq(loans.userId, userId), eq(loans.status, 'active')));
+      .where(baseFilter);
 
-    if (activeLoans.length === 0) return [];
+    if (targetLoans.length === 0) return [];
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Batch-load all principal payments for all active loans in ONE query
-    const loanIds = activeLoans.map(l => l.id);
+    const loanIds = targetLoans.map(l => l.id);
     const allPrincipalPayments = await db
       .select({
         loanId: payments.loanId,
@@ -211,7 +219,6 @@ export async function calculateRealTimeInterestForUser(userId: string) {
       ))
       .orderBy(payments.paymentDate);
 
-    // Group payments by loanId
     const paymentsByLoan = new Map<string, { paymentDate: Date; amount: string }[]>();
     for (const p of allPrincipalPayments) {
       if (!paymentsByLoan.has(p.loanId)) {
@@ -220,11 +227,15 @@ export async function calculateRealTimeInterestForUser(userId: string) {
       paymentsByLoan.get(p.loanId)!.push({ paymentDate: p.paymentDate, amount: p.amount });
     }
 
-    // Calculate interest for each loan using pre-loaded payments (no DB calls)
-    const loanInterests = activeLoans.map(loan => {
+    const loanInterests = targetLoans.map(loan => {
       const principal = parseFloat(loan.principalAmount);
       const rate = parseFloat(loan.interestRate);
       const loanPayments = paymentsByLoan.get(loan.id) || [];
+
+      // Closed/settled loans stop accruing interest at closedAt (or today if missing)
+      const accrualEnd = loan.status !== 'active' && loan.closedAt
+        ? new Date(loan.closedAt)
+        : today;
 
       const totalInterest = calculateInterestFromPayments(
         loanPayments,
@@ -232,7 +243,7 @@ export async function calculateRealTimeInterestForUser(userId: string) {
         rate,
         loan.interestRateType as 'monthly' | 'annual',
         new Date(loan.startDate),
-        today
+        accrualEnd
       );
 
       return {

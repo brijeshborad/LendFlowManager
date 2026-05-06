@@ -69,8 +69,24 @@ export default function Loans() {
         queryKey: ['/api/payments'],
     });
 
-    const {data: realTimeInterest = []} = useQuery<[]>({
-        queryKey: ['/api/interest/real-time'],
+    // Single-loan detail bundle — only fires on the detail page (not the list view).
+    // Returns loan + borrower + payments + computed interest totals in one round trip.
+    const {data: loanDetails, isLoading: loanDetailsLoading} = useQuery<{
+        loan: Loan;
+        borrower: Borrower | null;
+        payments: Payment[];
+        totals: {
+            totalInterest: number;
+            principalPaid: number;
+            interestPaid: number;
+            outstandingPrincipal: number;
+            pendingInterest: number;
+            latestInterestClearedDate: string | null;
+            accrualEndDate: string;
+        };
+    }>({
+        queryKey: ['/api/loans', selectedLoanId, 'details'],
+        enabled: !!selectedLoanId,
     });
 
     const {data: userSettings} = useQuery<any>({
@@ -214,10 +230,11 @@ export default function Loans() {
         if (id) setSelectedLoanId(id);
     }, []);
 
-    const selectedLoan = loans.find(l => l.id === selectedLoanId);
-    const selectedBorrower = borrowers.find(b => b.id === selectedLoan?.borrowerId);
-    const loanPayments = payments.filter((p: any) => p.loanId === selectedLoanId);
-    const loanInterest = realTimeInterest.find((i: any) => i.loanId === selectedLoanId);
+    // Detail view: prefer focused per-loan response (handles closed loans, scales to many users).
+    // Falls back to bulk arrays only while the per-loan request is in flight.
+    const selectedLoan = loanDetails?.loan ?? loans.find(l => l.id === selectedLoanId);
+    const selectedBorrower = loanDetails?.borrower ?? borrowers.find(b => b.id === selectedLoan?.borrowerId);
+    const loanPayments = loanDetails?.payments ?? [];
 
     const formatCurrency = (amount: string | number) => {
         const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -277,13 +294,21 @@ export default function Loans() {
         }
     };
 
-    if (selectedLoan) {
-        const totalPaid = loanPayments.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        const interestGenerated = loanInterest?.totalInterest || 0;
-        const interestPaid = loanPayments
-            .filter((p: any) => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
-            .reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-        const pendingInterest = interestGenerated - interestPaid;
+    if (selectedLoanId) {
+        if (loanDetailsLoading || !selectedLoan) {
+            return (
+                <div className="p-4 md:p-8 space-y-4">
+                    <Skeleton className="h-8 w-32"/>
+                    <Skeleton className="h-32 w-full"/>
+                    <Skeleton className="h-64 w-full"/>
+                </div>
+            );
+        }
+
+        const totals = loanDetails?.totals;
+        const interestGenerated = totals?.totalInterest ?? 0;
+        const interestPaid = totals?.interestPaid ?? 0;
+        const pendingInterest = totals?.pendingInterest ?? 0;
 
         return (
             <div className="p-4 md:p-8 space-y-4 md:space-y-6">
@@ -383,7 +408,7 @@ export default function Loans() {
                         <div className="flex items-center gap-1.5 px-2.5 py-0.5 bg-purple-50 dark:bg-purple-950/30 rounded-full">
                             <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
                             <span className="text-xs font-medium text-purple-700 dark:text-purple-400">
-                                Interest cleared till {getLatestInterestClearedDate(selectedLoan.id) ? formatDate(getLatestInterestClearedDate(selectedLoan.id)) : "-"}
+                                Interest cleared till {totals?.latestInterestClearedDate ? formatDate(totals.latestInterestClearedDate) : "-"}
                             </span>
                         </div>
                     </div>

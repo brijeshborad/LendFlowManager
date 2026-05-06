@@ -312,6 +312,13 @@ export default function Dashboard() {
         return `₹${num.toLocaleString('en-IN', {maximumFractionDigits: 0})}`;
     };
 
+    const activeBorrowerList = useMemo(() => {
+        const borrowerIdsWithActiveLoans = new Set(
+            loans.filter(l => l.status === 'active').map(l => l.borrowerId)
+        );
+        return borrowers.filter(b => borrowerIdsWithActiveLoans.has(b.id));
+    }, [borrowers, loans]);
+
     const handleViewDetails = (borrowerId: string) => {
         // Find the first loan for this borrower and navigate to loan details
         const borrowerLoan = loans.find(l => l.borrowerId === borrowerId);
@@ -598,17 +605,17 @@ export default function Dashboard() {
                                 <h2 className="text-lg md:text-xl font-semibold">Borrowers</h2>
                                 <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:flex">
                                     <TabsTrigger value="all" data-testid="tab-all" className="text-xs sm:text-sm">All
-                                        ({borrowers.length})</TabsTrigger>
+                                        ({activeBorrowerList.length})</TabsTrigger>
                                     <TabsTrigger value="active" data-testid="tab-active" className="text-xs sm:text-sm">
-                                        Active ({borrowers.filter((b) => b.status === 'active').length})
+                                        Active ({activeBorrowerList.filter((b) => b.status === 'active').length})
                                     </TabsTrigger>
                                     <TabsTrigger value="overdue" data-testid="tab-overdue"
                                                  className="text-xs sm:text-sm">
-                                        Overdue ({borrowers.filter((b) => b.status === 'overdue').length})
+                                        Overdue ({activeBorrowerList.filter((b) => b.status === 'overdue').length})
                                     </TabsTrigger>
                                     <TabsTrigger value="settled" data-testid="tab-settled"
                                                  className="text-xs sm:text-sm">
-                                        Settled ({borrowers.filter((b) => b.status === 'settled').length})
+                                        Settled ({activeBorrowerList.filter((b) => b.status === 'settled').length})
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
@@ -616,10 +623,10 @@ export default function Dashboard() {
                             {['all', 'active', 'overdue', 'settled'].map((tab) => (
                                 <TabsContent key={tab} value={tab} className="mt-0">
                                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-                                        {borrowers
+                                        {activeBorrowerList
                                             .filter((b) => tab === 'all' || b.status === tab)
                                             .map((borrower, index) => {
-                                                const borrowerLoans = loans.filter((l) => l.borrowerId === borrower.id);
+                                                const borrowerLoans = loans.filter((l) => l.borrowerId === borrower.id && l.status === 'active');
                                                 const borrowerPayments = payments.filter((p) =>
                                                     borrowerLoans.some((l) => l.id === p.loanId)
                                                 );
@@ -628,19 +635,12 @@ export default function Dashboard() {
                                                 const totalLent = borrowerLoans.reduce((sum, loan) => sum + (parseFloat(loan.principalAmount) || 0), 0);
                                                 const totalInterestGenerated = borrowerInterestData.reduce((sum: number, entry: any) => sum + entry.totalInterest, 0);
 
-                                                // Calculate payments allocation
-                                                let principalPaid = 0;
-                                                let interestPaid = 0;
-
-                                                borrowerPayments.forEach(payment => {
-                                                    const amount = parseFloat(payment.amount) || 0;
-                                                    // Always apply payment to interest first, then principal
-                                                    const pendingInterestAtTime = totalInterestGenerated - interestPaid;
-                                                    const toInterest = Math.min(amount, Math.max(0, pendingInterestAtTime));
-                                                    const toPrincipal = amount - toInterest;
-                                                    interestPaid += toInterest;
-                                                    principalPaid += toPrincipal;
-                                                });
+                                                const principalPaid = borrowerPayments
+                                                    .filter(p => p.paymentType === 'principal' || p.paymentType === 'mixed')
+                                                    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+                                                const interestPaid = borrowerPayments
+                                                    .filter(p => p.paymentType === 'interest' || p.paymentType === 'partial_interest')
+                                                    .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
 
                                                 const outstanding = totalLent - principalPaid;
                                                 const pendingInterest = totalInterestGenerated - interestPaid;
@@ -698,7 +698,7 @@ export default function Dashboard() {
                                                     />
                                                 );
                                             })}
-                                        {borrowers.filter((b) => tab === 'all' || b.status === tab).length === 0 && (
+                                        {activeBorrowerList.filter((b) => tab === 'all' || b.status === tab).length === 0 && (
                                             <div className="col-span-2 p-12 text-center text-muted-foreground">
                                                 <Users className="h-16 w-16 mx-auto mb-4 opacity-50"/>
                                                 <p>No {tab === 'all' ? '' : tab} borrowers</p>

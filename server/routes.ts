@@ -346,6 +346,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
     });
 
+    // Single-loan detail endpoint: loan + borrower + payments + interest.
+    // Designed so the loan detail page does NOT need to fetch all-loans/all-payments.
+    app.get("/api/loans/:id/details", isAuthenticated, async (req: any, res: Response) => {
+        try {
+            const userId = (req.user as User).id;
+            const details = await storage.getLoanDetails(req.params.id, userId);
+            if (!details) {
+                return res.status(404).json({message: "Loan not found"});
+            }
+            res.json(details);
+        } catch (error: any) {
+            console.error("Error fetching loan details:", error);
+            res.status(500).json({message: "Failed to fetch loan details"});
+        }
+    });
+
     app.post("/api/loans", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
@@ -918,17 +934,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     app.get("/api/reports/interest-earned", isAuthenticated, async (req: any, res: Response) => {
         try {
             const userId = (req.user as User).id;
+            const fromDate = req.query.from ? new Date(req.query.from as string) : null;
+            const toDate = req.query.to ? new Date(req.query.to as string) : null;
+
             const interestEntries = await getUserInterestEntries(userId);
 
-            console.log('interestEntries >>>>>>>>>>>>>>>', interestEntries);
-            // Group by month
-            const monthlyData = interestEntries.reduce((acc: Record<string, {
+            // Bucket by the entry's period start month, optionally filtered by date range
+            const filtered = interestEntries.filter((entry: any) => {
+                const periodStart = new Date(entry.periodStart);
+                if (fromDate && periodStart < fromDate) return false;
+                if (toDate && periodStart > toDate) return false;
+                return true;
+            });
+
+            const monthlyData = filtered.reduce((acc: Record<string, {
                 month: string;
                 total: number;
                 count: number
             }>, entry: any) => {
-                console.log('entry >>>>>>>>>>>>>>>', entry);
-                const date = new Date(entry.calculatedDate);
+                const date = new Date(entry.periodStart);
                 const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                 if (!acc[monthKey]) {
                     acc[monthKey] = {month: monthKey, total: 0, count: 0};
@@ -941,8 +965,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const monthlyReport = Object.values(monthlyData).sort((a: any, b: any) => a.month.localeCompare(b.month));
 
             res.json({
-                total: interestEntries.reduce((sum: number, e: any) => sum + parseFloat(e.interestAmount.toString()), 0),
-                count: interestEntries.length,
+                total: filtered.reduce((sum: number, e: any) => sum + parseFloat(e.interestAmount.toString()), 0),
+                count: filtered.length,
                 monthly: monthlyReport,
             });
         } catch (error: any) {
