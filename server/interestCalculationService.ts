@@ -104,23 +104,23 @@ export function calculateInterestFromPayments(
       .filter(p => p.date >= currentDate && p.date <= monthEndDate);
 
     let monthInterest = 0;
+    const isFirstMonth = currentDate.getTime() === new Date(startDate).getTime();
+    // Partial end = current calendar month is truncated by endDate (e.g. "today" mid-month)
+    const isPartialEnd = monthEndDate.getTime() < monthEnd.getTime();
 
     if (monthPayments.length === 0) {
-      if (currentDate.getTime() === new Date(startDate).getTime()) {
-        const daysFromStart = 30 - new Date(startDate).getDate() + 1;
-        monthInterest = interestRateType === 'monthly'
-          ? currentPrincipal * (interestRate / 100) * (daysFromStart / 30)
-          : currentPrincipal * (interestRate / 100 / 12) * (daysFromStart / 30);
-      } else if (monthEndDate.getTime() === endDate.getTime() && endDate.getDate() !== 30) {
-        const daysInPartialMonth = endDate.getDate();
-        monthInterest = interestRateType === 'monthly'
-          ? currentPrincipal * (interestRate / 100) * (daysInPartialMonth / 30)
-          : currentPrincipal * (interestRate / 100 / 12) * (daysInPartialMonth / 30);
-      } else {
-        monthInterest = interestRateType === 'monthly'
-          ? currentPrincipal * (interestRate / 100)
-          : currentPrincipal * (interestRate / 100 / 12);
+      let days = 30;
+      if (isFirstMonth && isPartialEnd) {
+        days = monthEndDate.getDate() - new Date(startDate).getDate() + 1;
+      } else if (isFirstMonth) {
+        days = 30 - new Date(startDate).getDate() + 1;
+      } else if (isPartialEnd) {
+        days = monthEndDate.getDate();
       }
+
+      monthInterest = interestRateType === 'monthly'
+        ? currentPrincipal * (interestRate / 100) * (days / 30)
+        : currentPrincipal * (interestRate / 100 / 12) * (days / 30);
     } else {
       for (const payment of monthPayments) {
         const daysBefore = payment.date.getDate();
@@ -132,8 +132,12 @@ export function calculateInterestFromPayments(
         currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
       }
 
+      // Days after the last payment, capped at the actual month end (so a payment
+      // in the current partial month only accrues up to "today", not a full 30 days)
       const lastPayment = monthPayments[monthPayments.length - 1];
-      const daysAfter = 30 - lastPayment.date.getDate();
+      const daysAfter = isPartialEnd
+        ? monthEndDate.getDate() - lastPayment.date.getDate()
+        : 30 - lastPayment.date.getDate();
       if (daysAfter > 0) {
         const periodInterest = interestRateType === 'monthly'
           ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)

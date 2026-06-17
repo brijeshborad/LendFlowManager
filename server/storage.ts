@@ -859,10 +859,25 @@ export class DatabaseStorage implements IStorage {
           }
         } else {
           // Has payments - split calculation
+          const isFirstMonth = monthStart.getTime() === new Date(startDate).getTime();
+          const isPartialEnd = monthEndDate.getTime() < monthEnd.getTime();
+          const startDay = new Date(startDate).getDate();
+          // Effective last day of this month's accrual window (caps the final partial month)
+          const monthEndDay = isPartialEnd ? monthEndDate.getDate() : 30;
+
+          // Reflect the actual span of days in the displayed "Days" column
+          if (isFirstMonth && isPartialEnd) {
+            daysInMonth = monthEndDay - startDay + 1;
+          } else if (isFirstMonth) {
+            daysInMonth = 30 - startDay + 1;
+          } else if (isPartialEnd) {
+            daysInMonth = monthEndDay;
+          }
+
           let periodStart = new Date(monthStart);
           let currentPeriodPrincipal = runningPrincipal;
           let breakdownParts = [];
-          
+
           for (const payment of monthPrincipalPayments) {
             // Days before payment (from 1st to payment date)
             const daysBefore = payment.date.getDate();
@@ -873,14 +888,14 @@ export class DatabaseStorage implements IStorage {
               monthlyInterest += periodInterest;
               breakdownParts.push(`${daysBefore}d@₹${currentPeriodPrincipal.toLocaleString()}`);
             }
-            
+
             // Reduce principal
             currentPeriodPrincipal = Math.max(0, currentPeriodPrincipal - payment.amount);
           }
-          
-          // Days after last payment (from payment date to end of month)
+
+          // Days after last payment (from payment date to end of month/till-date)
           const lastPayment = monthPrincipalPayments[monthPrincipalPayments.length - 1];
-          const daysAfter = 30 - lastPayment.date.getDate();
+          const daysAfter = monthEndDay - lastPayment.date.getDate();
           if (daysAfter > 0) {
             const periodInterest = loan.interestRateType === 'monthly'
               ? currentPeriodPrincipal * (interestRate / 100) * (daysAfter / 30)
