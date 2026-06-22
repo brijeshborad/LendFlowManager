@@ -90,6 +90,14 @@ export function calculateInterestFromPayments(
   let currentPrincipal = principalAmount;
   let currentDate = new Date(startDate);
 
+  // Apply principal payments chronologically. The per-payment split below is
+  // order-dependent, so callers passing payments in a different order (e.g.
+  // getLoanDetails feeds them newest-first from getPayments) would otherwise
+  // produce a different total for any month with multiple principal payments.
+  principalPaymentsList = [...principalPaymentsList].sort(
+    (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+  );
+
   // Calculate month by month
   while (currentDate < endDate) {
     const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
