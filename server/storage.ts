@@ -752,43 +752,25 @@ export class DatabaseStorage implements IStorage {
         const isFirstMonth = currentDate.getTime() === new Date(startDate).getTime();
         const isPartialEnd = monthEndDate.getTime() < monthEnd.getTime();
 
-        if (monthPayments.length === 0) {
-          let days = 30;
-          if (isFirstMonth && isPartialEnd) {
-            days = monthEndDate.getDate() - new Date(startDate).getDate() + 1;
-          } else if (isFirstMonth) {
-            days = 30 - new Date(startDate).getDate() + 1;
-          } else if (isPartialEnd) {
-            days = monthEndDate.getDate();
-          }
+        const rateFactor = loan.interestRateType === 'monthly'
+          ? interestRate / 100
+          : interestRate / 100 / 12;
 
-          monthInterest = loan.interestRateType === 'monthly'
-            ? currentPrincipal * (interestRate / 100) * (days / 30)
-            : currentPrincipal * (interestRate / 100 / 12) * (days / 30);
-        } else {
-          // Has payments - split calculation
-          for (const payment of monthPayments) {
-            const daysBefore = payment.date.getDate();
-            const periodInterest = loan.interestRateType === 'monthly'
-              ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
-              : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
-            monthInterest += periodInterest;
+        // Segment-by-segment accrual: count days SINCE the previous event (month start
+        // or prior payment), not the absolute day-of-month, so the segments sum to the
+        // actual elapsed days. See calculateInterestFromPayments for the canonical version.
+        let prevDay = isFirstMonth ? new Date(startDate).getDate() - 1 : 0;
+        const endDay = isPartialEnd ? monthEndDate.getDate() : 30;
 
-            currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
-          }
-
-          // Days after last payment
-          const lastPayment = monthPayments[monthPayments.length - 1];
-          const daysAfter = isPartialEnd
-            ? monthEndDate.getDate() - lastPayment.date.getDate()
-            : 30 - lastPayment.date.getDate();
-          if (daysAfter > 0) {
-            const periodInterest = loan.interestRateType === 'monthly'
-              ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
-              : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
-            monthInterest += periodInterest;
-          }
+        for (const payment of monthPayments) {
+          const days = payment.date.getDate() - prevDay;
+          if (days > 0) monthInterest += currentPrincipal * rateFactor * (days / 30);
+          currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+          prevDay = payment.date.getDate();
         }
+
+        const daysAfter = endDay - prevDay;
+        if (daysAfter > 0) monthInterest += currentPrincipal * rateFactor * (daysAfter / 30);
 
         loanInterestGenerated += monthInterest;
         
@@ -874,13 +856,16 @@ export class DatabaseStorage implements IStorage {
             daysInMonth = monthEndDay;
           }
 
-          let periodStart = new Date(monthStart);
           let currentPeriodPrincipal = runningPrincipal;
           let breakdownParts = [];
+          // Day boundary already accounted for: loan start day in the first month, else
+          // the 1st. Each segment counts days SINCE the previous event, not the absolute
+          // day-of-month, so segments sum to the real elapsed days.
+          let prevDay = isFirstMonth ? startDay - 1 : 0;
 
           for (const payment of monthPrincipalPayments) {
-            // Days before payment (from 1st to payment date)
-            const daysBefore = payment.date.getDate();
+            // Days since the previous event (month start or prior payment)
+            const daysBefore = payment.date.getDate() - prevDay;
             if (daysBefore > 0) {
               const periodInterest = loan.interestRateType === 'monthly'
                 ? currentPeriodPrincipal * (interestRate / 100) * (daysBefore / 30)
@@ -891,11 +876,11 @@ export class DatabaseStorage implements IStorage {
 
             // Reduce principal
             currentPeriodPrincipal = Math.max(0, currentPeriodPrincipal - payment.amount);
+            prevDay = payment.date.getDate();
           }
 
-          // Days after last payment (from payment date to end of month/till-date)
-          const lastPayment = monthPrincipalPayments[monthPrincipalPayments.length - 1];
-          const daysAfter = monthEndDay - lastPayment.date.getDate();
+          // Days after last payment (from last payment to end of month/till-date)
+          const daysAfter = monthEndDay - prevDay;
           if (daysAfter > 0) {
             const periodInterest = loan.interestRateType === 'monthly'
               ? currentPeriodPrincipal * (interestRate / 100) * (daysAfter / 30)
@@ -1073,43 +1058,25 @@ export class DatabaseStorage implements IStorage {
         const isFirstMonth = currentDate.getTime() === new Date(startDate).getTime();
         const isPartialEnd = monthEndDate.getTime() < monthEnd.getTime();
 
-        if (monthPayments.length === 0) {
-          let days = 30;
-          if (isFirstMonth && isPartialEnd) {
-            days = monthEndDate.getDate() - new Date(startDate).getDate() + 1;
-          } else if (isFirstMonth) {
-            days = 30 - new Date(startDate).getDate() + 1;
-          } else if (isPartialEnd) {
-            days = monthEndDate.getDate();
-          }
+        const rateFactor = loan.interestRateType === 'monthly'
+          ? interestRate / 100
+          : interestRate / 100 / 12;
 
-          monthInterest = loan.interestRateType === 'monthly'
-            ? currentPrincipal * (interestRate / 100) * (days / 30)
-            : currentPrincipal * (interestRate / 100 / 12) * (days / 30);
-        } else {
-          // Has payments - split calculation
-          for (const payment of monthPayments) {
-            const daysBefore = payment.date.getDate();
-            const periodInterest = loan.interestRateType === 'monthly'
-              ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
-              : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
-            monthInterest += periodInterest;
+        // Segment-by-segment accrual: count days SINCE the previous event (month start
+        // or prior payment), not the absolute day-of-month, so the segments sum to the
+        // actual elapsed days. See calculateInterestFromPayments for the canonical version.
+        let prevDay = isFirstMonth ? new Date(startDate).getDate() - 1 : 0;
+        const endDay = isPartialEnd ? monthEndDate.getDate() : 30;
 
-            currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
-          }
-
-          // Days after last payment
-          const lastPayment = monthPayments[monthPayments.length - 1];
-          const daysAfter = isPartialEnd
-            ? monthEndDate.getDate() - lastPayment.date.getDate()
-            : 30 - lastPayment.date.getDate();
-          if (daysAfter > 0) {
-            const periodInterest = loan.interestRateType === 'monthly'
-              ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
-              : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
-            monthInterest += periodInterest;
-          }
+        for (const payment of monthPayments) {
+          const days = payment.date.getDate() - prevDay;
+          if (days > 0) monthInterest += currentPrincipal * rateFactor * (days / 30);
+          currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+          prevDay = payment.date.getDate();
         }
+
+        const daysAfter = endDay - prevDay;
+        if (daysAfter > 0) monthInterest += currentPrincipal * rateFactor * (daysAfter / 30);
 
         totalInterestTillDate += monthInterest;
         

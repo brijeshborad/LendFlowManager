@@ -116,43 +116,29 @@ export function calculateInterestFromPayments(
     // Partial end = current calendar month is truncated by endDate (e.g. "today" mid-month)
     const isPartialEnd = monthEndDate.getTime() < monthEnd.getTime();
 
-    if (monthPayments.length === 0) {
-      let days = 30;
-      if (isFirstMonth && isPartialEnd) {
-        days = monthEndDate.getDate() - new Date(startDate).getDate() + 1;
-      } else if (isFirstMonth) {
-        days = 30 - new Date(startDate).getDate() + 1;
-      } else if (isPartialEnd) {
-        days = monthEndDate.getDate();
-      }
+    const rateFactor = interestRateType === 'monthly'
+      ? interestRate / 100
+      : interestRate / 100 / 12;
 
-      monthInterest = interestRateType === 'monthly'
-        ? currentPrincipal * (interestRate / 100) * (days / 30)
-        : currentPrincipal * (interestRate / 100 / 12) * (days / 30);
-    } else {
-      for (const payment of monthPayments) {
-        const daysBefore = payment.date.getDate();
-        const periodInterest = interestRateType === 'monthly'
-          ? currentPrincipal * (interestRate / 100) * (daysBefore / 30)
-          : currentPrincipal * (interestRate / 100 / 12) * (daysBefore / 30);
-        monthInterest += periodInterest;
+    // Accrue interest segment-by-segment within the month. `prevDay` is the day-of-month
+    // boundary already accounted for; each principal payment closes the current segment
+    // (on the balance held so far) and opens the next on the reduced balance. Counting
+    // days SINCE the previous event — not the absolute day-of-month — keeps the segments
+    // summing to the actual elapsed days (a month with payments on the 10th and 16th
+    // charges 10 + 6 days, not 10 + 16). For the first month, accrual starts on the loan
+    // start day rather than the 1st.
+    let prevDay = isFirstMonth ? new Date(startDate).getDate() - 1 : 0;
+    const endDay = isPartialEnd ? monthEndDate.getDate() : 30;
 
-        currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
-      }
-
-      // Days after the last payment, capped at the actual month end (so a payment
-      // in the current partial month only accrues up to "today", not a full 30 days)
-      const lastPayment = monthPayments[monthPayments.length - 1];
-      const daysAfter = isPartialEnd
-        ? monthEndDate.getDate() - lastPayment.date.getDate()
-        : 30 - lastPayment.date.getDate();
-      if (daysAfter > 0) {
-        const periodInterest = interestRateType === 'monthly'
-          ? currentPrincipal * (interestRate / 100) * (daysAfter / 30)
-          : currentPrincipal * (interestRate / 100 / 12) * (daysAfter / 30);
-        monthInterest += periodInterest;
-      }
+    for (const payment of monthPayments) {
+      const days = payment.date.getDate() - prevDay;
+      if (days > 0) monthInterest += currentPrincipal * rateFactor * (days / 30);
+      currentPrincipal = Math.max(0, currentPrincipal - payment.amount);
+      prevDay = payment.date.getDate();
     }
+
+    const daysAfter = endDay - prevDay;
+    if (daysAfter > 0) monthInterest += currentPrincipal * rateFactor * (daysAfter / 30);
 
     totalInterest += monthInterest;
 
