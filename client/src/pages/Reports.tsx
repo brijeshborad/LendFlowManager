@@ -66,8 +66,8 @@ type BorrowerSummaryItem = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "active", label: "Active only" },
   { value: "all", label: "All statuses" },
+  { value: "active", label: "Active only" },
   { value: "settled", label: "Settled" },
   { value: "closed", label: "Closed" },
 ];
@@ -104,14 +104,14 @@ export default function Reports() {
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
   const [borrowerFilter, setBorrowerFilter] = useState<string>("all");
-  const [statusFilter, setStatusFilter] = useState<string>("active");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
 
   const resetFilters = () => {
     setFromDate("");
     setToDate("");
     setBorrowerFilter("all");
-    setStatusFilter("active");
+    setStatusFilter("all");
     setPaymentTypeFilter("all");
   };
 
